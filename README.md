@@ -1,95 +1,104 @@
-🏛️ Full-Stack DAO Governance Platform
-This is a complete full-stack Decentralized Autonomous Organization (DAO) Governance DApp, structured as a monorepo. It contains both the Solidity smart contracts (backend) and the React-based frontend.
+# 🗳️ Full-Stack DAO Governance Platform
 
-✨ Features
-This first phase implements the foundational layer of a DAO:
+This repository contains a complete **full-stack Decentralized Autonomous Organization (DAO) Governance DApp**. Built as a monorepo, it features both Solidity smart contracts (backend) and a React-based UI (frontend).
 
-Wallet Connection: Securely connect with MetaMask.
+> 🚧 This is **Phase 1** of a multi-phase project. It currently focuses on governance token minting and delegation.
 
-Token Minting: A simple interface to mint new governance tokens for testing.
+---
 
-Balance Viewing: Real-time display of token balance and voting power.
+## 🌟 Features
 
-Vote Delegation: A crucial one-click action to delegate voting power to any address (including your own).
+- 🔐 Connect MetaMask wallet  
+- 🪙 Mint test governance tokens  
+- 🎯 Delegate voting power  
+- 🔎 View account and token details  
 
-Screenshot of the running application:
-(You should replace this URL with a link to your own screenshot!)
+---
 
-🧱 Tech Stack
-Backend (/)
-Solidity – Smart contract development
+## 🛠️ Tech Stack
 
-Hardhat – Ethereum development environment
+**Backend:**
 
-OpenZeppelin Contracts – Secure, audited base contracts for ERC20Votes
+- Solidity  
+- Hardhat  
+- OpenZeppelin Contracts  
+- Ethers.js  
+- TypeScript  
 
-Ethers.js – Blockchain interaction library
+**Frontend:**
 
-TypeScript – Safer scripting and deployment
+- React (with Vite)  
+- Tailwind CSS  
+- Ethers.js v6  
+- TypeScript  
 
-Frontend (/dao-frontend)
-React – UI framework
+---
 
-Vite – Fast frontend bundler and dev server
+## 📁 Monorepo Structure
 
-TypeScript – End-to-end type safety
-
-Tailwind CSS – Utility-first styling for a modern UI
-
-Ethers.js (v6) – Web3 interactions
-
-🗂️ Project Structure
 /
-├── contracts/          # Solidity smart contracts
-├── ignition/           # Hardhat deployment modules
-├── dao-frontend/       # The entire React frontend application
-│   ├── src/
-│   └── package.json
-├── hardhat.config.ts   # Hardhat configuration
+├── contracts/ # Solidity smart contracts
+├── ignition/ # Deployment modules
+├── dao-frontend/ # Frontend app
+│ ├── src/
+│ └── package.json
+├── hardhat.config.ts # Hardhat configuration
 ├── .gitignore
-└── package.json        # Backend dependencies
+└── package.json # Root dependencies
 
-🚀 Getting Started
-📋 Prerequisites
-Node.js v18+
+yaml
+Copy
+Edit
 
-NPM
+---
 
-MetaMask Browser Extension
+## 🚀 Getting Started
 
-📦 Installation & Setup
-Clone the repository and install all dependencies for both the backend and frontend.
+### ✅ Prerequisites
 
+- [Node.js v18+](https://nodejs.org/)
+- NPM
+- [MetaMask](https://metamask.io/)
+
+---
+
+### 📦 Installation
+
+```bash
+# Clone the repo
 git clone https://github.com/AryaSingh22/DAO-Governance-Dapp.git
 cd DAO-Governance-Dapp
 
-# Install backend dependencies
+# Install root dependencies
 npm install
 
 # Install frontend dependencies
 cd dao-frontend
 npm install
 cd ..
-
-🔧 1. Start the Local Blockchain
-Keep this terminal running — it's your local blockchain.
-
+⚙️ Start Local Blockchain
+bash
+Copy
+Edit
 npx hardhat node
+Leave this terminal running.
 
-📤 2. Deploy the Smart Contract
-In a second terminal:
+📜 Deploy Contracts
+In a new terminal:
 
+bash
+Copy
+Edit
 npx hardhat run ignition/modules/Lock.ts --network localhost
+📌 Copy the deployed contract address for frontend configuration.
 
-Copy the new contract address from the terminal output.
+🧩 Configure the Frontend
+Open dao-frontend/src/App.tsx
 
-🖥️ 3. Configure the Frontend
-Open dao-frontend/src/App.tsx.
+Replace the placeholder contract address with the one you just deployed.
 
-Replace the value of GOVERNANCE_TOKEN_ADDRESS with the new contract address you just copied.
-
-🦊 4. Configure MetaMask
-First, add the local Hardhat network:
+🦊 Configure MetaMask
+Add a new custom network in MetaMask:
 
 Network Name: Hardhat Localhost
 
@@ -99,37 +108,22 @@ Chain ID: 31337
 
 Currency Symbol: ETH
 
-Next, import the deployer account:
+Import the private key of Account #0 from the npx hardhat node output.
 
-Use the private key of Account #0 from the npx hardhat node terminal to import a new account into MetaMask.
-
-🧪 5. Run the Frontend
-In a third terminal:
-
+▶️ Run the Frontend
+bash
+Copy
+Edit
 cd dao-frontend
 npm run dev
+Visit: http://localhost:5173
 
-Your app will be live at: http://localhost:5173
-
-🛣️ Future Improvements
-Phase 2 – Core Governance: Implement Governor and Timelock contracts for proposal creation, voting, and execution.
-
-Phase 3 – Treasury Management: Create proposals that can execute on-chain transactions, such as ETH transfers from a treasury.
-
-Phase 4 – UI/UX Enhancements: Add support for ENS names and use IPFS for storing detailed proposal metadata.
-
-🙌 Acknowledgements
-This project stands on the shoulders of giants. A huge thank you to the teams behind these incredible tools:
-
-OpenZeppelin
-
-Hardhat
-
-Ethers.js
-
-React
-
-Tailwind CSS
+🔮 Roadmap
+Phase	Features
+1	✅ Token minting & delegation
+2	🧠 Governance logic with Governor & Timelock
+3	💰 Treasury actions through proposals
+4	🎨 Enhanced UI/UX (IPFS, ENS, proposal history)
 
 📄 License
 This project is licensed under the MIT License.
