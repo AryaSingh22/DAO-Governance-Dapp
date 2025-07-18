@@ -77,20 +77,14 @@ cd dao-frontend
 npm install
 cd ..
 ⚙️ Start Local Blockchain
-bash
-Copy
-Edit
 npx hardhat node
 Leave this terminal running.
 
 📜 Deploy Contracts
 In a new terminal:
-
-bash
-Copy
-Edit
 npx hardhat run ignition/modules/Lock.ts --network localhost
 📌 Copy the deployed contract address for frontend configuration.
+```
 
 🧩 Configure the Frontend
 Open dao-frontend/src/App.tsx
