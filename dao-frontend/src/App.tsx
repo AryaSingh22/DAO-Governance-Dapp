@@ -868,7 +868,7 @@ const GOVERNANCE_TOKEN_ABI = [
 
 // --- Step 2: Add the address of your deployed Governance Token contract ---
 // Remember to update this with your new address every time you restart the backend!
-const GOVERNANCE_TOKEN_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+const GOVERNANCE_TOKEN_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
 
 // --- Define a specific type for our contract to help TypeScript ---
 type GovernanceToken = ethers.Contract & {
@@ -892,11 +892,22 @@ function App() {
     const [tokenBalance, setTokenBalance] = useState("0");
     const [votingPower, setVotingPower] = useState("0");
     const [delegatee, setDelegatee] = useState("");
+    const [owner, setOwner] = useState<string | null>(null);
     
     const [mintAmount, setMintAmount] = useState("100");
+    const [burnAmount, setBurnAmount] = useState("0");
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ text: "", type: "" });
+
+    const [newOwner, setNewOwner] = useState("");
+    const [delegateTo, setDelegateTo] = useState("");
+    const [historyBlock, setHistoryBlock] = useState("");
+    const [historyVotes, setHistoryVotes] = useState<string | null>(null);
+    const [burnFromAddress, setBurnFromAddress] = useState("");
+    const [burnFromAmount, setBurnFromAmount] = useState("");
+    const [latestSnapshotId, setLatestSnapshotId] = useState<string | null>(null);
+    const [paused, setPaused] = useState<boolean>(false);
 
     // --- Effects ---
 
@@ -957,12 +968,31 @@ function App() {
             const balance = await contractInstance.balanceOf(userAddress);
             const votes = await contractInstance.getVotes(userAddress);
             const currentDelegatee = await contractInstance.delegates(userAddress);
-
+            const contractOwner = await contractInstance.owner();
+            let snapshotId = null;
+            let isPaused = false;
+            try {
+                // Try to get the latest snapshot ID (if available)
+                const filter = contractInstance.filters.Snapshot();
+                const events = await contractInstance.queryFilter(filter);
+                if (events.length > 0) {
+                    const lastEvent = events[events.length - 1];
+                    if ('args' in lastEvent && lastEvent.args && lastEvent.args.id) {
+                        snapshotId = lastEvent.args.id.toString();
+                    }
+                }
+            } catch {}
+            try {
+                isPaused = await contractInstance.paused();
+            } catch {}
             setTokenName(name);
             setTokenSymbol(symbol);
             setTokenBalance(ethers.formatEther(balance));
             setVotingPower(ethers.formatEther(votes));
             setDelegatee(currentDelegatee);
+            setOwner(contractOwner);
+            setLatestSnapshotId(snapshotId);
+            setPaused(isPaused);
         } catch (error) {
             console.error("Error fetching token data:", error);
             if ((error as any).message.includes("call revert exception")) {
@@ -1006,6 +1036,10 @@ function App() {
 
     const handleMint = async () => {
         if (!contract || !account) return;
+        if (owner && account.toLowerCase() !== owner.toLowerCase()) {
+            showMessage("Only the contract owner can mint tokens.", "error");
+            return;
+        }
         setIsLoading(true);
         try {
             const amount = ethers.parseEther(mintAmount);
@@ -1034,6 +1068,140 @@ function App() {
         } catch (error) {
             console.error("Error delegating votes:", error);
             showMessage("Delegation failed. See console for details.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleBurn = async () => {
+        if (!contract || !account) return;
+        setIsLoading(true);
+        try {
+            const amount = ethers.parseEther(burnAmount);
+            const tx = await contract.burn(amount);
+            await tx.wait();
+            showMessage(`Successfully burned ${burnAmount} ${tokenSymbol}!`, "success");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            console.error("Error burning tokens:", error);
+            showMessage("Burn failed. See console for details.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleTransferOwnership = async () => {
+        if (!contract || !account || !newOwner) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.transferOwnership(newOwner);
+            await tx.wait();
+            showMessage("Ownership transferred!", "success");
+            setNewOwner("");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Transfer failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleRenounceOwnership = async () => {
+        if (!contract || !account) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.renounceOwnership();
+            await tx.wait();
+            showMessage("Ownership renounced!", "success");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Renounce failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleDelegateTo = async () => {
+        if (!contract || !account || !delegateTo) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.delegate(delegateTo);
+            await tx.wait();
+            showMessage("Delegated!", "success");
+            setDelegateTo("");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Delegation failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleGetPastVotes = async () => {
+        if (!contract || !account || !historyBlock) return;
+        setIsLoading(true);
+        try {
+            const votes = await contract.getPastVotes(account, BigInt(historyBlock));
+            setHistoryVotes(ethers.formatEther(votes));
+        } catch (error) {
+            setHistoryVotes(null);
+            showMessage("Failed to fetch past votes.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleBurnFrom = async () => {
+        if (!contract || !account || !burnFromAddress || !burnFromAmount) return;
+        setIsLoading(true);
+        try {
+            const amount = ethers.parseEther(burnFromAmount);
+            const tx = await contract.burnFrom(burnFromAddress, amount);
+            await tx.wait();
+            showMessage("Burned from address!", "success");
+            setBurnFromAddress("");
+            setBurnFromAmount("");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("BurnFrom failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleSnapshot = async () => {
+        if (!contract || !account) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.snapshot();
+            await tx.wait();
+            showMessage("Snapshot taken!", "success");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Snapshot failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handlePause = async () => {
+        if (!contract || !account) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.pause();
+            await tx.wait();
+            showMessage("Token paused!", "success");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Pause failed.", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleUnpause = async () => {
+        if (!contract || !account) return;
+        setIsLoading(true);
+        try {
+            const tx = await contract.unpause();
+            await tx.wait();
+            showMessage("Token unpaused!", "success");
+            await fetchTokenData(contract, account);
+        } catch (error) {
+            showMessage("Unpause failed.", "error");
         } finally {
             setIsLoading(false);
         }
@@ -1135,27 +1303,33 @@ function App() {
                                     Governance Actions
                                 </h3>
                                 {/* Mint Tokens */}
-                                <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div className="md:col-span-1">
-                                        <p className="font-medium text-slate-100">1. Get Tokens</p>
-                                        <p className="text-slate-400 text-xs mt-1">Mint new test tokens to your wallet.</p>
+                                {owner && account && owner.toLowerCase() === account.toLowerCase() ? (
+                                    <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                        <div className="md:col-span-1">
+                                            <p className="font-medium text-slate-100">1. Get Tokens</p>
+                                            <p className="text-slate-400 text-xs mt-1">Mint new test tokens to your wallet.</p>
+                                        </div>
+                                        <div className="md:col-span-2 flex items-center space-x-2">
+                                            <input 
+                                                type="number"
+                                                value={mintAmount}
+                                                onChange={(e) => setMintAmount(e.target.value)}
+                                                className="bg-slate-950 border border-slate-700 text-white w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                            />
+                                            <button 
+                                                onClick={handleMint} 
+                                                disabled={isLoading}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:bg-slate-700 disabled:cursor-not-allowed shrink-0"
+                                            >
+                                                {isLoading ? '...' : 'Mint'}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="md:col-span-2 flex items-center space-x-2">
-                                        <input 
-                                            type="number"
-                                            value={mintAmount}
-                                            onChange={(e) => setMintAmount(e.target.value)}
-                                            className="bg-slate-950 border border-slate-700 text-white w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                        />
-                                        <button 
-                                            onClick={handleMint} 
-                                            disabled={isLoading}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:bg-slate-700 disabled:cursor-not-allowed shrink-0"
-                                        >
-                                            {isLoading ? '...' : 'Mint'}
-                                        </button>
+                                ) : (
+                                    <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 text-slate-400 text-center">
+                                        <p>Only the contract owner can mint new tokens.</p>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Delegate Votes */}
                                 <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
@@ -1173,7 +1347,83 @@ function App() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Burn Tokens */}
+                                <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
+                                    <div className="md:col-span-1">
+                                        <p className="font-medium text-slate-100">3. Burn Tokens</p>
+                                        <p className="text-slate-400 text-xs mt-1">Destroy your tokens permanently.</p>
+                                    </div>
+                                    <div className="md:col-span-2 flex items-center space-x-2">
+                                        <input
+                                            type="number"
+                                            value={burnAmount}
+                                            min="0"
+                                            onChange={(e) => setBurnAmount(e.target.value)}
+                                            className="bg-slate-950 border border-slate-700 text-white w-full px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                        />
+                                        <button
+                                            onClick={handleBurn}
+                                            disabled={isLoading || parseFloat(burnAmount) <= 0}
+                                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:bg-slate-700 disabled:cursor-not-allowed shrink-0"
+                                        >
+                                            {isLoading ? '...' : 'Burn'}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Owner Info & Management */}
+                            <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 mb-4">
+                                <p className="text-slate-400 text-sm">Current Owner: <span className="text-slate-100 font-mono">{owner}</span></p>
+                                {owner && account && owner.toLowerCase() === account.toLowerCase() && (
+                                    <div className="mt-2 flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <input type="text" value={newOwner} onChange={e => setNewOwner(e.target.value)} placeholder="New owner address" className="bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md" />
+                                            <button onClick={handleTransferOwnership} disabled={isLoading || !newOwner} className="bg-cyan-700 text-white px-3 py-1 rounded-md">Transfer Ownership</button>
+                                        </div>
+                                        <button onClick={handleRenounceOwnership} disabled={isLoading} className="bg-red-700 text-white px-3 py-1 rounded-md">Renounce Ownership</button>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Delegation UI */}
+                            <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 mb-4">
+                                <p className="text-slate-400 text-sm">Current Delegatee: <span className="text-slate-100 font-mono">{delegatee}</span></p>
+                                <div className="flex gap-2 mt-2">
+                                    <input type="text" value={delegateTo} onChange={e => setDelegateTo(e.target.value)} placeholder="Delegate to address" className="bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md" />
+                                    <button onClick={handleDelegateTo} disabled={isLoading || !delegateTo} className="bg-green-700 text-white px-3 py-1 rounded-md">Delegate</button>
+                                </div>
+                            </div>
+                            {/* Voting Power History */}
+                            <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 mb-4">
+                                <div className="flex gap-2 items-center">
+                                    <input type="number" value={historyBlock} onChange={e => setHistoryBlock(e.target.value)} placeholder="Block number" className="bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md" />
+                                    <button onClick={handleGetPastVotes} disabled={isLoading || !historyBlock} className="bg-blue-700 text-white px-3 py-1 rounded-md">Get Past Votes</button>
+                                    {historyVotes !== null && <span className="text-slate-100 ml-2">Votes: {historyVotes}</span>}
+                                </div>
+                            </div>
+                            {/* Burn From */}
+                            <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 mb-4">
+                                <div className="flex gap-2 items-center">
+                                    <input type="text" value={burnFromAddress} onChange={e => setBurnFromAddress(e.target.value)} placeholder="Address" className="bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md" />
+                                    <input type="number" value={burnFromAmount} onChange={e => setBurnFromAmount(e.target.value)} placeholder="Amount" className="bg-slate-950 border border-slate-700 text-white px-2 py-1 rounded-md" />
+                                    <button onClick={handleBurnFrom} disabled={isLoading || !burnFromAddress || !burnFromAmount} className="bg-red-700 text-white px-3 py-1 rounded-md">Burn From</button>
+                                </div>
+                            </div>
+                            {/* Snapshot & Pause Controls (Owner Only) */}
+                            {owner && account && owner.toLowerCase() === account.toLowerCase() && (
+                                <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 mb-4 flex flex-col gap-2">
+                                    <div className="flex gap-2 items-center">
+                                        <button onClick={handleSnapshot} disabled={isLoading} className="bg-purple-700 text-white px-3 py-1 rounded-md">Take Snapshot</button>
+                                        {latestSnapshotId && <span className="text-slate-400 text-sm">Latest Snapshot ID: <span className="text-slate-100 font-mono">{latestSnapshotId}</span></span>}
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <span className="text-slate-400 text-sm">Paused: <span className={paused ? "text-red-400" : "text-green-400"}>{paused ? "Yes" : "No"}</span></span>
+                                        <button onClick={handlePause} disabled={isLoading || paused} className="bg-yellow-700 text-white px-3 py-1 rounded-md">Pause</button>
+                                        <button onClick={handleUnpause} disabled={isLoading || !paused} className="bg-green-700 text-white px-3 py-1 rounded-md">Unpause</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
