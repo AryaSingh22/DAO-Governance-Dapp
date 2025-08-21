@@ -37,9 +37,9 @@ This repository contains a complete **full-stack Decentralized Autonomous Organi
 ## 📁 Monorepo Structure
 
 /
-├── contracts/ # Solidity smart contracts
-├── ignition/ # Deployment modules
-├── dao-frontend/ # Frontend app
+├── contracts / # Solidity smart contracts
+├── ignition / # Deployment modules
+├── dao-frontend / # Frontend app
 │ ├── src/
 │ └── package.json
 ├── hardhat.config.ts # Hardhat configuration
