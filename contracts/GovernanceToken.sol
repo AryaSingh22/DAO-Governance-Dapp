@@ -11,7 +11,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 
 /**
  * GovernanceToken: ERC20Votes with permit, burn, and pausability.
- * - Owner can mint and pause/unpause
+ * - Owner can mint and pause/unpause 
  * - Compatible with OpenZeppelin Governor (IVotes)
  */
 contract GovernanceToken is
