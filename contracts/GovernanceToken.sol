@@ -52,7 +52,7 @@ contract GovernanceToken is
     function _update(address from, address to, uint256 value)
         internal
         override(ERC20, ERC20Votes)
-        whenNotPaused
+        whenNotPaused 
     {
         super._update(from, to, value);
     }
