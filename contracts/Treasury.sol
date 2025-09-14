@@ -16,7 +16,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract Treasury is Ownable, Pausable, ReentrancyGuard {
     event EthReceived(address indexed from, uint256 amount);
     event EthTransferred(address indexed to, uint256 amount);
-    event TokenTransferred(address indexed token, address indexed to, uint256 amount);
+    event TokenTransferred(address indexed token, address indexed to, uint256 amount); 
     event NFTTransferred(address indexed token, address indexed to, uint256 tokenId);
     event StreamCreated(address indexed recipient, uint256 amount, uint256 duration, uint256 startTime);
     event StreamClaimed(address indexed recipient, uint256 amount);
