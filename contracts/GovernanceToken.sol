@@ -8,7 +8,7 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
-
+       
 /**
  * GovernanceToken: ERC20Votes with permit, burn, and pausability.
  * - Owner can mint and pause/unpause 
