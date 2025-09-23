@@ -31,7 +31,7 @@ contract GovernanceToken is
     }
 
     // Admin actions
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external onlyOwner { 
         _mint(to, amount);
     }
 
