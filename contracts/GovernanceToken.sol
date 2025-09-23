@@ -6,7 +6,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";      
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";   
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";       
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";        
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";    
         
 /** 
