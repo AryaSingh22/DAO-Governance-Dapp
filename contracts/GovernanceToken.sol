@@ -9,7 +9,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";       
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";    
        
-/**
+/** 
  * GovernanceToken: ERC20Votes with permit, burn, and pausability.
  * - Owner can mint and pause/unpause 
  * - Compatible with OpenZeppelin Governor (IVotes)
