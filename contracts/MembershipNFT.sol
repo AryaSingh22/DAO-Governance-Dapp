@@ -14,7 +14,7 @@ contract MembershipNFT is ERC721, ERC721URIStorage, Ownable {
      
     string public baseTokenURI;
     bool public mintingEnabled; 
-    uint256 public mintPrice;
+    uint256 public mintPrice; 
     uint256 public maxSupply;
     
     mapping(address => bool) public isMember;
