@@ -6,7 +6,7 @@ import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";   
     
 /** 
- * DAO Membership NFT - represents membership in the DAO
+ * DAO Membership NFT - represents membership in the DAO 
  * Can be minted by governance proposals or by meeting certain criteria
  */ 
 contract MembershipNFT is ERC721, ERC721URIStorage, Ownable {  
