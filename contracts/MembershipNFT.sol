@@ -11,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  */
 contract MembershipNFT is ERC721, ERC721URIStorage, Ownable { 
     uint256 private _tokenIds;
-    
+     
     string public baseTokenURI;
     bool public mintingEnabled;
     uint256 public mintPrice;
