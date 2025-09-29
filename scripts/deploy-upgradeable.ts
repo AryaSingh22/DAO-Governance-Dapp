@@ -12,7 +12,7 @@ async function main() {
   const proposalThreshold = ethers.parseEther("1"); // 1 token
   const quorumPercent = 4; // 4%
   const timelockDelay = 86400; // 24 hours
-  const mintPrice = 0; // Free minting  
+  const mintPrice = 0; // Free minting    
   const maxSupply = 10000; // 10,000 memberships
 
   console.log("Deploying GovernanceTokenUpgradeable...");
