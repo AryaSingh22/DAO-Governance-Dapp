@@ -5,7 +5,7 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying upgradeable contracts with the account:", deployer.address);     
   console.log("Account balance:", (await deployer.provider.getBalance(deployer.address)).toString());   
-
+       
   // Deployment parameters
   const votingDelay = 1; // 1 block
   const votingPeriod = 600; // ~10 minutes on testnet (1 block = 1 second)
