@@ -14,7 +14,7 @@ async function main() {
   const timelockDelay = 86400; // 24 hours
   const mintPrice = 0; // Free minting    
   const maxSupply = 10000; // 10,000 memberships
-
+ 
   console.log("Deploying GovernanceTokenUpgradeable...");
   const GovernanceToken = await ethers.getContractFactory("GovernanceTokenUpgradeable");
   const token = await upgrades.deployProxy(GovernanceToken, [], { initializer: 'initialize' });
