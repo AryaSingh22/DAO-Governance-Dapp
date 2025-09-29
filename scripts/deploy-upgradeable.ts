@@ -1,6 +1,6 @@
 import { ethers, upgrades } from "hardhat";    
 
-async function main() {    
+async function main() {     
   // Get accounts 
   const [deployer] = await ethers.getSigners();
   console.log("Deploying upgradeable contracts with the account:", deployer.address);     
