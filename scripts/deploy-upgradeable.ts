@@ -4,7 +4,7 @@ async function main() {
   // Get accounts 
   const [deployer] = await ethers.getSigners();
   console.log("Deploying upgradeable contracts with the account:", deployer.address);     
-  console.log("Account balance:", (await deployer.provider.getBalance(deployer.address)).toString());
+  console.log("Account balance:", (await deployer.provider.getBalance(deployer.address)).toString());   
 
   // Deployment parameters
   const votingDelay = 1; // 1 block
