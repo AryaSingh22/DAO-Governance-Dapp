@@ -10,7 +10,7 @@ async function main() {
   const votingDelay = 1; // 1 block
   const votingPeriod = 600; // ~10 minutes on testnet (1 block = 1 second)
   const proposalThreshold = ethers.parseEther("1"); // 1 token
-  const quorumPercent = 4; // 4%
+  const quorumPercent = 4; // 4%   
   const timelockDelay = 86400; // 24 hours
   const mintPrice = 0; // Free minting    
   const maxSupply = 10000; // 10,000 memberships
