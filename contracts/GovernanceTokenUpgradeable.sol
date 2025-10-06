@@ -10,7 +10,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol"; 
 
-contract GovernanceTokenUpgradeable is 
+contract GovernanceTokenUpgradeable is  
     Initializable,
     ERC20Upgradeable,
     ERC20PermitUpgradeable,
