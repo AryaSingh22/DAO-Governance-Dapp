@@ -11,7 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol"; 
 
 contract GovernanceTokenUpgradeable is  
-    Initializable,
+    Initializable, 
     ERC20Upgradeable,
     ERC20PermitUpgradeable,
     ERC20VotesUpgradeable,
