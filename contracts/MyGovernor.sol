@@ -12,7 +12,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/**             
+/**              
  * Enhanced Governor with proposal metadata, guardian role, and advanced features
  */
 contract MyGovernor is
