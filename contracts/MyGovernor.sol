@@ -38,7 +38,7 @@ contract MyGovernor is
         VotingMode votingMode;
     }
 
-    struct DelegationNode {
+    struct DelegationNode { 
         address delegate;
         uint256 weight;
         bool active;
