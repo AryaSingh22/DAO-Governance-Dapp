@@ -15,7 +15,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /**               
  * Enhanced Governor with proposal metadata, guardian role, and advanced features
  */
-contract MyGovernor is
+contract MyGovernor is 
     Governor,
     GovernorSettings,
     GovernorCountingSimple,
