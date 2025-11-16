@@ -5,19 +5,26 @@
   "scripts": {
     "test": "npx hardhat test",
     "test:coverage": "npx hardhat coverage",
-    "test:watch": "npx hardhat test --watch"
+    "test:watch": "npx hardhat test --watch",
+    "test:research": "npx hardhat test test/ResearchRegistry.test.ts",
+    "test:reputation": "npx hardhat test test/ReputationManager.test.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^24.6.2",
     "hardhat": "^2.26.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
-    "@openzeppelin/hardhat-upgrades": "^3.9.1"
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0"
   }
 }

@@ -7,6 +7,9 @@ import { TOKEN_ADDRESS, TOKEN_ABI } from './config/contracts'
 import Governance from './components/Governance'
 import ProposalHistory from './components/ProposalHistory'
 import Dashboard from './components/Dashboard'
+import ResearchSubmission from './components/ResearchSubmission'
+import ResearchArchive from './components/ResearchArchive'
+import ReputationBadges from './components/ReputationBadges'
 
 function App() {
   const [provider, setProvider] = useState<BrowserProvider | null>(null)
@@ -15,7 +18,7 @@ function App() {
   const [balance, setBalance] = useState<string>('0')
   const [delegatedTo, setDelegatedTo] = useState<string>('')
   const [delegatee, setDelegatee] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'governance' | 'history' | 'token'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'governance' | 'history' | 'token' | 'research' | 'reputation'>('dashboard')
 
   useEffect(() => {
     if ((window as any).ethereum) {
@@ -100,7 +103,7 @@ function App() {
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-4xl font-bold text-center mb-8 text-cyan-300">
-          🗳️ Advanced DAO Governance Platform
+          🧪 ResearchDAO Governance Platform
         </h1>
 
         {!account ? (
@@ -132,6 +135,8 @@ function App() {
             <div className="flex flex-wrap gap-2 mb-6">
               <TabButton id="dashboard" label="Dashboard" icon="📊" />
               <TabButton id="governance" label="Governance" icon="🗳️" />
+              <TabButton id="research" label="Research" icon="🔬" />
+              <TabButton id="reputation" label="Reputation" icon="🏆" />
               <TabButton id="history" label="History" icon="📜" />
               <TabButton id="token" label="Token" icon="🪙" />
             </div>
@@ -139,6 +144,15 @@ function App() {
             {/* Tab Content */}
             {activeTab === 'dashboard' && <Dashboard />}
             {activeTab === 'governance' && <Governance />}
+            {activeTab === 'research' && (
+              <div className="space-y-6 mt-8">
+                <ResearchSubmission provider={provider} account={account} />
+                <ResearchArchive provider={provider} account={account} />
+              </div>
+            )}
+            {activeTab === 'reputation' && (
+              <ReputationBadges provider={provider} account={account} />
+            )}
             {activeTab === 'history' && <ProposalHistory />}
             {activeTab === 'token' && (
               <div className="space-y-6 mt-8">

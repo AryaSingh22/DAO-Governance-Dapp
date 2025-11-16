@@ -1,137 +1,141 @@
-# Testnet Deployment Checklist
+# Sepolia Testnet Deployment Checklist
 
-## Pre-Deployment
+## Pre-Deployment Checks
 
-### 1. Environment Setup
-- [ ] Install Node.js v18+
-- [ ] Install project dependencies: `npm install`
-- [ ] Install frontend dependencies: `cd dao-frontend && npm install`
-- [ ] Configure environment variables in `.env` file:
-  ```
-  GOERLI_RPC_URL=your_rpc_url
-  PRIVATE_KEY=your_private_key
-  ETHERSCAN_API_KEY=your_etherscan_api_key
-  ```
+### Environment Setup
+- [ ] Ensure Node.js >= 16.0.0 is installed
+- [ ] Verify Hardhat is properly installed
+- [ ] Check that all dependencies are installed (`npm install`)
+- [ ] Confirm `.env` file contains:
+  - `SEPOLIA_RPC_URL`
+  - `PRIVATE_KEY`
+  - `ETHERSCAN_API_KEY`
 
-### 2. Contract Verification
-- [ ] Review all contract code for potential issues
-- [ ] Run local tests: `npm run test`
-- [ ] Check test coverage: `npm run test:coverage`
-- [ ] Perform static analysis with Slither or similar tools
+### Code Verification
+- [ ] All contracts compile without errors (`npx hardhat compile`)
+- [ ] Contract sizes are within Ethereum limits (`npx hardhat size-contracts`)
+- [ ] All tests pass (`npx hardhat test`)
+- [ ] Code has been reviewed for security issues
 
-### 3. Configuration Review
-- [ ] Verify deployment parameters in `scripts/deploy-testnet.ts`
-- [ ] Check governance parameters (voting delay, period, quorum)
-- [ ] Confirm timelock delay is appropriate for testnet
-- [ ] Review membership NFT parameters
+### Configuration Review
+- [ ] Hardhat configuration is correct (`hardhat.config.ts`)
+- [ ] Network settings for Sepolia are properly configured
+- [ ] Deployment parameters are set appropriately:
+  - Voting delay
+  - Voting period
+  - Proposal threshold
+  - Quorum percentage
+  - Timelock delay
 
 ## Deployment Process
 
-### 1. Network Configuration
-- [ ] Add network configuration to `hardhat.config.ts`:
-  ```typescript
-  goerli: {
-    url: process.env.GOERLI_RPC_URL,
-    accounts: [process.env.PRIVATE_KEY]
-  }
-  ```
+### 1. Start Deployment
+- [ ] Run deployment script: `npx hardhat run scripts/deploy-dao.ts --network sepolia`
+- [ ] Monitor deployment progress in console
+- [ ] Note any errors or warnings
 
-### 2. Contract Deployment
-- [ ] Deploy contracts: `npx hardhat run scripts/deploy-testnet.ts --network goerli`
-- [ ] Note contract addresses from deployment output
-- [ ] Verify contracts on Etherscan (automatically done by script)
+### 2. Contract Verification
+- [ ] Verify GovernanceToken on Etherscan
+- [ ] Verify TimelockController on Etherscan
+- [ ] Verify ProposalMetadataManager on Etherscan
+- [ ] Verify Guardian on Etherscan
+- [ ] Verify VotingEngine on Etherscan
+- [ ] Verify ProposalExecutor on Etherscan
+- [ ] Verify ModularGovernor on Etherscan
+- [ ] Verify Treasury on Etherscan
+- [ ] Verify MembershipNFT on Etherscan
+- [ ] Verify DAORegistry on Etherscan
 
-### 3. Role Configuration
-- [ ] Confirm Timelock roles are properly set:
-  - PROPOSER_ROLE granted to Governor
-  - EXECUTOR_ROLE granted to ZeroAddress
-  - CANCELLER_ROLE granted to Governor
-- [ ] Verify Treasury ownership transferred to Timelock
-- [ ] Verify MembershipNFT ownership transferred to Timelock
-- [ ] Confirm Guardian roles are set correctly
+### 3. Post-Deployment Setup
+- [ ] Confirm all contract addresses are displayed correctly
+- [ ] Verify role assignments in TimelockController
+- [ ] Test basic governance functionality:
+  - Token delegation
+  - Proposal creation
+  - Voting
+  - Proposal execution
+- [ ] Test emergency functions through Guardian contract
+- [ ] Verify DAORegistry contains all contract addresses
 
 ### 4. Frontend Integration
-- [ ] Update contract addresses in `dao-frontend/src/config/contracts.ts`
-- [ ] Verify ABI imports are correct
-- [ ] Test frontend connection to deployed contracts
+- [ ] Update frontend configuration file with new contract addresses
+- [ ] Test frontend connection to all contracts
+- [ ] Verify proposal creation through frontend
+- [ ] Test voting functionality through frontend
+- [ ] Confirm treasury interactions work correctly
 
-## Post-Deployment Verification
+## Security Checks
 
-### 1. Contract Functionality
-- [ ] Test token minting functionality
-- [ ] Verify delegation and voting power calculations
-- [ ] Test proposal creation with metadata
-- [ ] Execute full governance flow (propose → vote → queue → execute)
-- [ ] Test emergency controls (guardian cancellation)
-- [ ] Verify Treasury operations (ETH/ERC20 transfers)
-- [ ] Test Membership NFT minting and burning
+### Access Control Verification
+- [ ] Confirm only authorized addresses can perform administrative functions
+- [ ] Verify timelock delays are properly enforced
+- [ ] Test emergency cancellation through Guardian contract
+- [ ] Confirm ownership transfers were completed correctly
 
-### 2. Frontend Testing
-- [ ] Connect MetaMask to testnet
-- [ ] Test wallet connection functionality
-- [ ] Verify token balance display
-- [ ] Test proposal creation form
-- [ ] Execute voting functionality
-- [ ] Test governance actions (queue, execute)
-- [ ] Verify dashboard analytics
+### Functionality Testing
+- [ ] Test all proposal types (Finance, Protocol, Community, Emergency, Research)
+- [ ] Verify metadata is correctly stored and retrieved
+- [ ] Test quadratic voting functionality
+- [ ] Confirm delegation hierarchy works correctly
+- [ ] Verify treasury can receive and send assets
+- [ ] Test MembershipNFT minting and transfers
 
-### 3. Security Checks
-- [ ] Verify ownership transfers were successful
-- [ ] Confirm role assignments are correct
-- [ ] Test access controls for admin functions
-- [ ] Verify timelock delays are functioning
-- [ ] Test emergency pause functionality
-
-## Verification Commands
+## Documentation Updates
 
 ### Contract Addresses
-```bash
-# Get contract addresses
-npx hardhat run scripts/deploy-testnet.ts --network goerli
-```
+- [ ] Record all deployed contract addresses
+- [ ] Update project documentation with new addresses
+- [ ] Add addresses to deployment summary
 
-### Role Verification
-```bash
-# Check Timelock roles
-npx hardhat console --network goerli
-> const timelock = await ethers.getContractAt("TimelockController", "TIMELOCK_ADDRESS")
-> const PROPOSER_ROLE = await timelock.PROPOSER_ROLE()
-> await timelock.hasRole(PROPOSER_ROLE, "GOVERNOR_ADDRESS")
-```
+### Deployment Summary
+- [ ] Document any issues encountered during deployment
+- [ ] Record gas costs for each contract deployment
+- [ ] Note any deviations from expected behavior
+- [ ] Update deployment instructions if needed
 
-### Governance Testing
-```bash
-# Test proposal creation
-npx hardhat console --network goerli
-> const governor = await ethers.getContractAt("MyGovernor", "GOVERNOR_ADDRESS")
-> const token = await ethers.getContractAt("GovernanceToken", "TOKEN_ADDRESS")
-> await token.delegate("YOUR_ADDRESS")
-> await governor.propose([target], [value], [calldata], "Test proposal")
-```
+## Post-Deployment Monitoring
 
-## Troubleshooting
+### Network Monitoring
+- [ ] Monitor contract interactions on Sepolia
+- [ ] Watch for any failed transactions
+- [ ] Track gas usage for common operations
+- [ ] Monitor for any unexpected behavior
 
-### Common Issues
-1. **Insufficient funds**: Ensure deployer account has enough ETH for gas
-2. **Role configuration errors**: Verify all roles are properly assigned
-3. **Frontend connection issues**: Check contract addresses and network configuration
-4. **Verification failures**: Ensure Etherscan API key is correct and contracts are compiled
+### Community Testing
+- [ ] Provide contract addresses to test users
+- [ ] Collect feedback on functionality
+- [ ] Address any issues discovered during testing
+- [ ] Update documentation based on user feedback
 
-### Useful Commands
-```bash
-# Check account balance
-npx hardhat run scripts/check-balance.ts --network goerli
+## Rollback Plan
 
-# Reset deployment (if needed)
-npx hardhat clean
-npx hardhat compile
+### In Case of Critical Issues
+- [ ] Document steps to rollback deployment
+- [ ] Prepare emergency contact list for team members
+- [ ] Have backup deployment scripts ready
+- [ ] Coordinate with frontend team for quick updates
 
-# Run specific tests
-npx hardhat test test/GovernanceToken.test.ts
-```
+## Success Criteria
 
-## Next Steps
-- [ ] Document deployed contract addresses
-- [ ] Share with team for testing
-- [ ] Prepare mainnet deployment plan
-- [ ] Schedule security audit
+### Deployment Success
+- [ ] All contracts deployed without errors
+- [ ] All contracts verified on Etherscan
+- [ ] All role assignments completed correctly
+- [ ] Basic governance functionality working
+- [ ] Frontend successfully integrated with contracts
+
+### Testing Success
+- [ ] All core functionality tested and working
+- [ ] No critical security vulnerabilities identified
+- [ ] Performance within acceptable limits
+- [ ] User experience meets expectations
+
+## Completion Checklist
+
+### Final Verification
+- [ ] All contracts deployed and verified
+- [ ] All functionality tested
+- [ ] Documentation updated
+- [ ] Team briefed on deployment
+- [ ] Monitoring in place
+- [ ] Rollback plan documented
