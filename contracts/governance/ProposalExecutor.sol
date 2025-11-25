@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24; 
 
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol"; 
 
 /**
  * @title ProposalExecutor
@@ -84,3 +84,4 @@ contract ProposalExecutor {
     }
 
 }
+
