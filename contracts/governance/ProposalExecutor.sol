@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -82,4 +82,5 @@ contract ProposalExecutor {
         // In a real implementation, we would call the ResearchRegistry to approve the paper
         emit ResearchPaperApproved(proposalId, paperId);
     }
+
 }
