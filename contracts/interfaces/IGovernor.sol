@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
-interface IGovernor {
+interface IGovernor { 
     // Events
     event ProposalCanceled(uint256 proposalId);
     event ProposalCreated(
@@ -118,5 +118,6 @@ enum ProposalState {
     Executed
 
 }
+
 
 
