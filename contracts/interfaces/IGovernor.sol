@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT 
 pragma solidity ^0.8.24;
  
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
@@ -118,3 +118,4 @@ enum ProposalState {
     Executed
 
 }
+
