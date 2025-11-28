@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT 
 pragma solidity ^0.8.24; 
-  
+   
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
@@ -118,6 +118,7 @@ enum ProposalState {
     Executed
 
 }
+
 
 
 
