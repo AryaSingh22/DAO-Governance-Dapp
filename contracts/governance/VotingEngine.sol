@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
+import {Governor} from "@openzeppelin/contracts/governance/Governor.sol"; 
 
 /**
  * @title VotingEngine
@@ -73,4 +73,5 @@ contract VotingEngine {
         
         return y;
     }
+
 }
