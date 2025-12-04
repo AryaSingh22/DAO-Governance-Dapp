@@ -13,7 +13,7 @@ import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Nonce
 contract GovernanceTokenUpgradeable is  
     Initializable, 
     ERC20Upgradeable,
-    ERC20PermitUpgradeable,
+    ERC20PermitUpgradeable, 
     ERC20VotesUpgradeable,
     ERC20BurnableUpgradeable,
     OwnableUpgradeable,
