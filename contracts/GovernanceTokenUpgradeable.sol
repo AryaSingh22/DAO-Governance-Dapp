@@ -9,7 +9,7 @@ import {ERC20BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/toke
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";  
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol"; 
-
+ 
 contract GovernanceTokenUpgradeable is  
     Initializable, 
     ERC20Upgradeable,
