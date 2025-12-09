@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT 
 pragma solidity ^0.8.24; 
  
 interface IVotingEngine {
@@ -12,5 +12,6 @@ interface IVotingEngine {
     function getDelegationChain(address delegator) external view returns (address[] memory);
 
 }
+
 
 
