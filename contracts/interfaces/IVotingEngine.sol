@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 interface IVotingEngine {
     // Events
@@ -10,4 +10,5 @@ interface IVotingEngine {
     function castQuadraticVote(uint256 proposalId, uint256 votes) external returns (uint256 sqrtVotes);
     function createDelegation(address delegate) external;
     function getDelegationChain(address delegator) external view returns (address[] memory);
+
 }
