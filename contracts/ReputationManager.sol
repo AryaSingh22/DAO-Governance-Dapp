@@ -9,7 +9,7 @@ import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/
  * Reputation Manager - tracks user contributions and awards NFT badges
  * Handles reputation points for submissions, votes, and reviews
  */
-contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
+contract ReputationManager is ERC721, ERC721URIStorage, Ownable { 
     struct BadgeTier {
         string name;
         string description;
@@ -255,6 +255,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
     }
 
 }
+
 
 
 
