@@ -87,7 +87,7 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
         if (submissionFee > 0) {
             require(
                 IERC20(governanceToken).transferFrom(
-                    msg.sender,
+                    msg.sender, 
                     address(this),
                     submissionFee
                 ),
@@ -199,4 +199,5 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
     function getTotalPapers() external view returns (uint256) {
         return _paperIds;
     }
+
 }
