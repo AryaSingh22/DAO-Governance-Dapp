@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol"; 
 
 /**
  * Research Registry - stores research papers submitted to the DAO
@@ -201,3 +201,4 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
     }
 
 }
+
