@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 interface IProposalManager { 
     enum ProposalCategory { Finance, Protocol, Community, Emergency, Research }
@@ -36,3 +36,4 @@ interface IProposalManager {
     function getLinkedPaperId(uint256 proposalId) external view returns (uint256);
 
 }
+
