@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface IProposalManager {
+interface IProposalManager { 
     enum ProposalCategory { Finance, Protocol, Community, Emergency, Research }
     
     struct ProposalMetadata {
@@ -34,4 +34,5 @@ interface IProposalManager {
     function getProposalMetadata(uint256 proposalId) external view returns (ProposalMetadata memory);
     function getProposalCategory(uint256 proposalId) external view returns (ProposalCategory);
     function getLinkedPaperId(uint256 proposalId) external view returns (uint256);
+
 }
