@@ -1,6 +1,6 @@
 <<<<<<< HEAD:contracts/core/GovernanceToken.sol
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
@@ -63,6 +63,7 @@ contract GovernanceToken is
 
     // Remove the _burn override since it's not virtual in ERC20
     // The _burn function from ERC20Burnable will be used instead
+
 }
 =======
 // SPDX-License-Identifier: MIT
