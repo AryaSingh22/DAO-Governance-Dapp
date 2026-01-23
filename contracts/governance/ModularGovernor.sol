@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {BaseGovernor} from "./BaseGovernor.sol"; 
+import {BaseGovernor} from "./BaseGovernor.sol";
 import {ProposalMetadataManager} from "./ProposalMetadataManager.sol"; 
 import {Guardian} from "./Guardian.sol";
 import {VotingEngine} from "./VotingEngine.sol";
@@ -153,6 +153,7 @@ contract ModularGovernor is BaseGovernor {
     }
 
 }
+
 
 
 
