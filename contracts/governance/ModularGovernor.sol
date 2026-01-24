@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 import {BaseGovernor} from "./BaseGovernor.sol";
 import {ProposalMetadataManager} from "./ProposalMetadataManager.sol"; 
@@ -153,6 +153,7 @@ contract ModularGovernor is BaseGovernor {
     }
 
 }
+
 
 
 
