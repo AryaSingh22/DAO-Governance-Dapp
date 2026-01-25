@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BaseGovernor} from "./BaseGovernor.sol"; 
 import {ProposalMetadataManager} from "./ProposalMetadataManager.sol"; 
-import {Guardian} from "./Guardian.sol";
+import {Guardian} from "./Guardian.sol"; 
 import {VotingEngine} from "./VotingEngine.sol";
 import {ProposalExecutor} from "./ProposalExecutor.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
@@ -153,6 +153,7 @@ contract ModularGovernor is BaseGovernor {
     }
 
 }
+
 
 
 
