@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ProposalFilters from './ProposalFilters';
 
 interface Proposal {
@@ -24,11 +24,11 @@ interface EnhancedProposalListProps {
   onExecute: (proposal: Proposal) => void;
 }
 
-export default function EnhancedProposalList({ 
-  proposals, 
-  onVote, 
-  onQueue, 
-  onExecute 
+export default function EnhancedProposalList({
+  proposals,
+  onVote,
+  onQueue,
+  onExecute
 }: EnhancedProposalListProps) {
   const [filteredProposals, setFilteredProposals] = useState<Proposal[]>(proposals);
   const [filters, setFilters] = useState({
@@ -39,36 +39,34 @@ export default function EnhancedProposalList({
     sortOrder: 'desc' as 'asc' | 'desc'
   });
 
-  useEffect(() => {
-    applyFilters();
-  }, [proposals, filters]);
 
-  const applyFilters = () => {
+
+  const applyFilters = useCallback(() => {
     let result = [...proposals];
-    
+
     // Apply category filter
     if (filters.category !== null) {
       result = result.filter(p => p.category === filters.category);
     }
-    
+
     // Apply status filter
     if (filters.status !== null) {
       result = result.filter(p => p.state === filters.status);
     }
-    
+
     // Apply search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      result = result.filter(p => 
+      result = result.filter(p =>
         p.title.toLowerCase().includes(searchLower) ||
         p.description.toLowerCase().includes(searchLower)
       );
     }
-    
+
     // Apply sorting
     result.sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (filters.sortBy) {
         case 'createdAt':
           aValue = a.createdAt;
@@ -90,23 +88,27 @@ export default function EnhancedProposalList({
           aValue = a.createdAt;
           bValue = b.createdAt;
       }
-      
+
       if (filters.sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
         return aValue < bValue ? 1 : -1;
       }
     });
-    
+
     setFilteredProposals(result);
-  };
+  }, [proposals, filters]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setFilters(newFilters);
   };
 
   const statusLabel = (s: number) => {
-    const map: Record<number,string> = {
+    const map: Record<number, string> = {
       0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated', 4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed'
     };
     return map[s] ?? String(s);
@@ -143,7 +145,7 @@ export default function EnhancedProposalList({
   return (
     <div>
       <ProposalFilters onFilterChange={handleFilterChange} />
-      
+
       <div className="space-y-4">
         {filteredProposals.length === 0 ? (
           <div className="bg-slate-900/70 p-8 rounded-lg border border-slate-800 text-center">
@@ -169,9 +171,9 @@ export default function EnhancedProposalList({
                   <div>Created: {formatDate(p.createdAt)}</div>
                 </div>
               </div>
-              
+
               <p className="text-slate-300 mb-4">{p.description}</p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="text-center p-3 bg-slate-800/50 rounded">
                   <div className="text-lg font-semibold text-green-400">{p.forVotes}</div>
@@ -186,41 +188,41 @@ export default function EnhancedProposalList({
                   <div className="text-xs text-slate-400">Abstain Votes</div>
                 </div>
               </div>
-              
+
               <div className="text-xs text-slate-400 mb-4">
                 Snapshot: {p.start.toString()} • Deadline: {p.end.toString()}
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={() => onVote(p.id, 1)} 
+                <button
+                  onClick={() => onVote(p.id, 1)}
                   className="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
                 >
                   Vote For
                 </button>
-                <button 
-                  onClick={() => onVote(p.id, 0)} 
+                <button
+                  onClick={() => onVote(p.id, 0)}
                   className="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
                 >
                   Vote Against
                 </button>
-                <button 
-                  onClick={() => onVote(p.id, 2)} 
+                <button
+                  onClick={() => onVote(p.id, 2)}
                   className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
                 >
                   Abstain
                 </button>
                 {p.state === 4 && (
-                  <button 
-                    onClick={() => onQueue(p)} 
+                  <button
+                    onClick={() => onQueue(p)}
                     className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1 rounded text-sm"
                   >
                     Queue
                   </button>
                 )}
                 {p.state === 5 && (
-                  <button 
-                    onClick={() => onExecute(p)} 
+                  <button
+                    onClick={() => onExecute(p)}
                     className="bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"
                   >
                     Execute

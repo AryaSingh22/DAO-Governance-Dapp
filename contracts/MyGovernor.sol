@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24; 
- 
-import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
+pragma solidity ^0.8.24;  
+
+import {Governor} from "@openzeppelin/contracts/governance/Governor.sol"; 
 import {GovernorSettings} from "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
-import {GovernorVotes} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
-import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+import {GovernorVotes} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";        
+import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol"; 
 import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";     
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
+import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol"; 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol"; 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";   
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ReputationManager} from "./ReputationManager.sol";   
 
-/**          
+/**               
  * Enhanced Governor with proposal metadata, guardian role, and advanced features
  */
 contract MyGovernor is 
@@ -36,6 +38,7 @@ contract MyGovernor is
         bool executed;
         bool canceled;
         VotingMode votingMode;
+        uint256 linkedPaperId;
     }
 
     struct DelegationNode { 
@@ -47,6 +50,10 @@ contract MyGovernor is
     address public guardian;
     mapping(uint256 => ProposalMetadata) public proposalMetadata;
     mapping(uint256 => bool) public proposalCanceled;
+    
+    IERC721 public membershipNFT;
+    ReputationManager public reputationManager;
+    uint256 constant MAX_DELEGATION_DEPTH = 5;
     
     // Delegation hierarchy mappings
     mapping(address => DelegationNode[]) public delegationChain;
@@ -70,7 +77,8 @@ contract MyGovernor is
         uint48 _votingDelay,
         uint32 _votingPeriod,
         uint256 _proposalThreshold,
-        uint256 _quorumPercent
+        uint256 _quorumPercent,
+        IERC721 _membershipNFT
     )
         Governor("MyGovernor")
         GovernorSettings(_votingDelay, _votingPeriod, _proposalThreshold)
@@ -80,6 +88,7 @@ contract MyGovernor is
         Ownable(msg.sender)
     {
         guardian = msg.sender; // Initially set to deployer
+        membershipNFT = _membershipNFT;
     }
 
     // Guardian management
@@ -87,6 +96,10 @@ contract MyGovernor is
         address oldGuardian = guardian;
         guardian = newGuardian;
         emit GuardianSet(oldGuardian, newGuardian);
+    }
+
+    function setReputationManager(ReputationManager _reputationManager) external onlyOwner {
+        reputationManager = _reputationManager;
     }
 
     // Emergency proposal cancellation by guardian
@@ -106,7 +119,8 @@ contract MyGovernor is
         string memory description,
         string memory ipfsCID,
         ProposalCategory category,
-        VotingMode votingMode
+        VotingMode votingMode,
+        uint256 linkedPaperId
     ) public returns (uint256) {
         uint256 proposalId = propose(targets, values, calldatas, description);
         
@@ -118,7 +132,8 @@ contract MyGovernor is
             createdAt: block.timestamp,
             executed: false,
             canceled: false,
-            votingMode: votingMode
+            votingMode: votingMode,
+            linkedPaperId: linkedPaperId
         });
         
         emit ProposalMetadataSet(proposalId, title, description, ipfsCID, category, votingMode);
@@ -135,7 +150,7 @@ contract MyGovernor is
         string memory ipfsCID,
         ProposalCategory category
     ) public returns (uint256) {
-        return proposeWithMetadata(targets, values, calldatas, title, description, ipfsCID, category, VotingMode.Standard);
+        return proposeWithMetadata(targets, values, calldatas, title, description, ipfsCID, category, VotingMode.Standard, 0);
     }
 
     // Override state to check for guardian cancellation
@@ -164,19 +179,18 @@ contract MyGovernor is
     }
 
     // Quadratic voting implementation
-    function castQuadraticVote(uint256 proposalId, uint8 support, uint256 votes) public {
+    function castQuadraticVote(uint256 proposalId, uint8 support) public {
         require(state(proposalId) == ProposalState.Active, "Governor: vote not currently active");
-        require(votes > 0, "Governor: votes must be positive");
+        require(membershipNFT.balanceOf(msg.sender) > 0, "Not a member");
         
-        // Calculate square root of votes for quadratic voting
-        uint256 sqrtVotes = Math.sqrt(votes * 1e18) / 1e9; // Scale to maintain precision
+        uint256 snapshotBlock = proposalSnapshot(proposalId);
+        uint256 votes = getVotes(msg.sender, snapshotBlock);
+        require(votes > 0, "Governor: no voting power at snapshot");
         
-        // Check if user has enough voting power
-        uint256 availableVotes = getVotes(msg.sender, block.timestamp);
-        require(availableVotes >= votes, "Governor: insufficient voting power");
+        uint256 sqrtVotes = Math.sqrt(votes);
         
-        // Record quadratic vote
-        quadraticVotes[proposalId] = sqrtVotes;
+        // Record quadratic vote (accumulate)
+        quadraticVotes[proposalId] += sqrtVotes;
         
         // Cast vote with quadratic weight
         _countVote(proposalId, msg.sender, support, sqrtVotes, "");
@@ -190,10 +204,20 @@ contract MyGovernor is
         require(weight > 0, "Weight must be positive");
         require(weight <= 100, "Weight cannot exceed 100%");
         
-        // Check if user has voting power
-        uint256 votingPower = getVotes(msg.sender, block.timestamp);
-        require(votingPower > 0, "No voting power to delegate");
+        // Check if user has voting power (use token directly)
+        require(token().getVotes(msg.sender) > 0, "No voting power to delegate");
+        require(delegators[delegate] == address(0), "Already has a delegator");
         
+        // Check that delegate is not already in msg.sender's upstream chain
+        uint256 depth = 0;
+        address cursor = delegators[msg.sender];
+        while (cursor != address(0) && depth < MAX_DELEGATION_DEPTH) {
+            require(cursor != delegate, "Circular delegation detected");
+            cursor = delegators[cursor];
+            depth++;
+        }
+        require(depth < MAX_DELEGATION_DEPTH, "Delegation chain too deep");
+
         // Add to delegation chain
         delegationChain[msg.sender].push(DelegationNode({
             delegate: delegate,
@@ -232,8 +256,9 @@ contract MyGovernor is
 
     // Helper function to calculate delegated voting power
     function getDelegatedVotingPower(address voter) public view returns (uint256) {
-        uint256 totalPower = getVotes(voter, block.timestamp);
+        uint256 totalPower = getVotes(voter, Math.max(0, clock() - 1));
         address current = voter;
+        uint256 depth = 0;
         
         // Traverse delegation chain
         while (delegators[current] != address(0)) {
@@ -243,12 +268,14 @@ contract MyGovernor is
             for (uint256 i = 0; i < chain.length; i++) {
                 if (chain[i].delegate == current && chain[i].active) {
                     // Apply delegation weight
-                    uint256 delegatorPower = getVotes(delegator, block.timestamp);
+                    uint256 delegatorPower = getVotes(delegator, Math.max(0, clock() - 1));
                     totalPower += (delegatorPower * chain[i].weight) / 100;
                     break;
                 }
             }
             current = delegator;
+            depth++;
+            if (depth >= MAX_DELEGATION_DEPTH) break;
         }
         
         return totalPower;
@@ -269,6 +296,10 @@ contract MyGovernor is
 
     function getProposalVotingMode(uint256 proposalId) external view returns (VotingMode) {
         return proposalMetadata[proposalId].votingMode;
+    }
+
+    function getLinkedPaper(uint256 proposalId) external view returns (uint256) {
+        return proposalMetadata[proposalId].linkedPaperId;
     }
 
     // The following functions are overrides required by Solidity.
@@ -297,6 +328,29 @@ contract MyGovernor is
         returns (uint256)
     {
         return super.quorum(blockNumber);
+    }
+
+    function _quorumReached(uint256 proposalId) internal view override(Governor, GovernorCountingSimple) returns (bool) {
+        if (proposalMetadata[proposalId].votingMode == VotingMode.Quadratic) {
+            (, uint256 forVotes, uint256 abstainVotes) = proposalVotes(proposalId);
+            uint256 standardQuorum = quorum(proposalSnapshot(proposalId));
+            return (forVotes + abstainVotes) >= Math.sqrt(standardQuorum);
+        }
+        return super._quorumReached(proposalId);
+    }
+
+    function _countVote(
+        uint256 proposalId,
+        address account,
+        uint8 support,
+        uint256 weight,
+        bytes memory params
+    ) internal override(Governor, GovernorCountingSimple) returns (uint256) {
+        uint256 castWeight = super._countVote(proposalId, account, support, weight, params);
+        if (address(reputationManager) != address(0)) {
+            try reputationManager.addVotingPoints(account) {} catch {}
+        }
+        return castWeight;
     }
 
     // Explicitly resolve proposalThreshold ambiguity to GovernorSettings implementation

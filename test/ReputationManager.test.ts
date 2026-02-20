@@ -20,6 +20,9 @@ describe("ReputationManager", function () {
       "ipfs://reputation/"
     );
 
+    const REPUTATION_MANAGER_ROLE = await reputationManager.REPUTATION_MANAGER_ROLE();
+    await reputationManager.grantRole(REPUTATION_MANAGER_ROLE, owner.address);
+
     return { reputationManager, owner, addr1, addr2 };
   }
 
@@ -108,7 +111,7 @@ describe("ReputationManager", function () {
       const { reputationManager, addr1, addr2 } = await loadFixture(deployReputationManagerFixture);
 
       await expect(reputationManager.connect(addr1).addPoints(addr2.address, 50, "Test"))
-        .to.be.revertedWithCustomError(reputationManager, "OwnableUnauthorizedAccount");
+        .to.be.revertedWithCustomError(reputationManager, "AccessControlUnauthorizedAccount");
     });
 
     it("Should award badges when points threshold is reached", async function () {
@@ -206,6 +209,136 @@ describe("ReputationManager", function () {
       expect(badge[1]).to.equal("Submitted first research paper");
       expect(badge[2]).to.equal(100n);
       expect(badge[3]).to.equal("ipfs://researcher.json");
+    });
+  });
+
+  describe("Edge Cases and Advanced Interaction", function () {
+    it("Should correctly manage nextBadgeIdToCheck across multiple point additions", async function () {
+      const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
+
+      // Add 100 points -> Earns badge 1 (Researcher)
+      await reputationManager.connect(owner).addPoints(addr1.address, 100, "Initial");
+      expect((await reputationManager.getUserBadges(addr1.address)).length).to.equal(1);
+
+      // nextBadgeIdToCheck for addr1 should now be 2 (since 100 < 500 for tier 2)
+      expect(await reputationManager.nextBadgeIdToCheck(addr1.address)).to.equal(2n);
+
+      // Add another 400 points -> Earns badge 2 (Contributor)
+      await reputationManager.connect(owner).addPoints(addr1.address, 400, "Followup");
+      const badges = await reputationManager.getUserBadges(addr1.address);
+      expect(badges.length).to.equal(2);
+      expect(badges[1]).to.equal(2n); // Won badge ID 2
+
+      // nextBadgeIdToCheck should now be 3
+      expect(await reputationManager.nextBadgeIdToCheck(addr1.address)).to.equal(3n);
+    });
+
+    it("Should stop checking for badges if points requirement is not met", async function () {
+      const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
+      // Tier 1 is 100. Let's add 50.
+      await reputationManager.connect(owner).addPoints(addr1.address, 50, "Partial points");
+
+      // No badges
+      const badges = await reputationManager.getUserBadges(addr1.address);
+      expect(badges.length).to.equal(0);
+
+      // nextBadgeIdToCheck should be stuck at 1
+      expect(await reputationManager.nextBadgeIdToCheck(addr1.address)).to.equal(1n);
+    });
+
+    it("Should handle unordered custom badge creation by skipping unreachable tiers", async function () {
+      const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
+
+      // Create a badge that is very expensive (Badge 5)
+      await reputationManager.connect(owner).createBadgeTier("Impossible", "Too hard", 10000, "ipfs://impl.json");
+
+      // Create a badge that is easy (Badge 6)
+      await reputationManager.connect(owner).createBadgeTier("Easy", "Very easy", 50, "ipfs://easy.json");
+
+      // Give 50 points. This is enough for Badge 6 but NOT Badge 5.
+      // Because the loop stops at the first un-affordable badge (Badge 1 = 100), it won't even reach Badge 6!
+      await reputationManager.connect(owner).addPoints(addr1.address, 50, "Give 50");
+      expect((await reputationManager.getUserBadges(addr1.address)).length).to.equal(0);
+    });
+  });
+
+  describe("Access Control and Admin", function () {
+    it("Should allow granting REPUTATION_MANAGER_ROLE to another account", async function () {
+      const { reputationManager, owner, addr1, addr2 } = await loadFixture(deployReputationManagerFixture);
+
+      const REPUTATION_MANAGER_ROLE = await reputationManager.REPUTATION_MANAGER_ROLE();
+
+      // Grant to addr1
+      await reputationManager.connect(owner).grantRole(REPUTATION_MANAGER_ROLE, addr1.address);
+
+      // addr1 should now be able to add points
+      await expect(reputationManager.connect(addr1).addPoints(addr2.address, 10, "Test"))
+        .to.not.be.reverted;
+
+      const rep = await reputationManager.getUserReputation(addr2.address);
+      expect(rep[0]).to.equal(10n);
+    });
+
+    it("Should allow a user to renounce their own REPUTATION_MANAGER_ROLE", async function () {
+      const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
+
+      const REPUTATION_MANAGER_ROLE = await reputationManager.REPUTATION_MANAGER_ROLE();
+      await reputationManager.connect(owner).grantRole(REPUTATION_MANAGER_ROLE, addr1.address);
+
+      // addr1 renounces
+      await reputationManager.connect(addr1).renounceRole(REPUTATION_MANAGER_ROLE, addr1.address);
+
+      await expect(reputationManager.connect(addr1).addPoints(owner.address, 10, "Test"))
+        .to.be.revertedWithCustomError(reputationManager, "AccessControlUnauthorizedAccount");
+    });
+  });
+
+  describe("Miscellaneous and Overrides", function () {
+    it("Should return properly constructed empty array for getLeaderboard", async function () {
+      const { reputationManager } = await loadFixture(deployReputationManagerFixture);
+
+      const leaderboard = await reputationManager.getLeaderboard(5);
+      expect(leaderboard.length).to.equal(5);
+      expect(leaderboard[0]).to.equal(hre.ethers.ZeroAddress);
+    });
+
+    it("Should support ERC721 and AccessControl interfaces via supportsInterface", async function () {
+      const { reputationManager } = await loadFixture(deployReputationManagerFixture);
+
+      // 0x80ac58cd = ERC721
+      expect(await reputationManager.supportsInterface("0x80ac58cd")).to.be.true;
+
+      // 0x7965db0b = AccessControl
+      expect(await reputationManager.supportsInterface("0x7965db0b")).to.be.true;
+
+      // 0x00000000 = Invalid interface
+      expect(await reputationManager.supportsInterface("0xffffffff")).to.be.false;
+    });
+
+    it("Should return correct baseTokenURI string when queried", async function () {
+      const { reputationManager } = await loadFixture(deployReputationManagerFixture);
+      expect(await reputationManager.baseTokenURI()).to.equal("ipfs://reputation/");
+    });
+
+    it("Should allow transfer of badges between users since Standard ERC721 is used", async function () {
+      const { reputationManager, owner, addr1, addr2 } = await loadFixture(deployReputationManagerFixture);
+
+      // Earn badge
+      await reputationManager.connect(owner).addPoints(addr1.address, 100, "Achievement");
+
+      // User addr1 earned Badge 1, mapping to tokenId 1
+      expect(await reputationManager.ownerOf(1n)).to.equal(addr1.address);
+
+      // Transfer badge to addr2
+      await reputationManager.connect(addr1).transferFrom(addr1.address, addr2.address, 1n);
+
+      expect(await reputationManager.ownerOf(1n)).to.equal(addr2.address);
+    });
+
+    it("Should return correct tokenURI properly forming base and token", async function () {
+      const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
+      await reputationManager.connect(owner).addPoints(addr1.address, 100, "Achievement");
+      expect(await reputationManager.tokenURI(1n)).to.equal("ipfs://reputation/");
     });
   });
 });

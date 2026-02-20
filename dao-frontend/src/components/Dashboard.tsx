@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { BrowserProvider, Contract, ethers } from 'ethers';
 import { TOKEN_ADDRESS, TOKEN_ABI, TREASURY_ADDRESS, TREASURY_ABI, MEMBERSHIP_NFT_ADDRESS, MEMBERSHIP_NFT_ABI } from '../config/contracts';
 
@@ -29,8 +29,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if ((window as any).ethereum) {
-      const p = new BrowserProvider((window as any).ethereum);
+    if (window.ethereum) {
+      const p = new BrowserProvider(window.ethereum);
       setProvider(p);
     }
   }, []);
@@ -48,7 +48,7 @@ export default function Dashboard() {
     })();
   }, [provider]);
 
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     if (!token || !treasury || !membershipNFT) return;
     setLoading(true);
 
@@ -56,17 +56,17 @@ export default function Dashboard() {
       // Token metrics
       const totalSupply = await token.totalSupply();
       const treasuryBalance = await provider?.getBalance(TREASURY_ADDRESS) || 0n;
-      
+
       // Membership metrics
       const totalMembers = await membershipNFT.totalSupply();
-      
+
       // Treasury streams (simplified - in real app you'd track all streams)
       const activeStreams = 0; // Would need to iterate through all streams
       const totalStreamsValue = '0'; // Would calculate from active streams
-      
+
       // Voting power metrics
       const averageVotingPower = ethers.formatEther(totalSupply / 10n); // Simplified
-      
+
       // Top holders (simplified - would need to track all holders)
       const topHolders = [
         { address: '0x1234...', balance: ethers.formatEther(totalSupply / 4n), percentage: 25 },
@@ -88,11 +88,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, treasury, membershipNFT, provider]);
 
   useEffect(() => {
     loadMetrics();
-  }, [token, treasury, membershipNFT]);
+  }, [loadMetrics]);
 
   const formatNumber = (num: string) => {
     const n = parseFloat(num);
@@ -115,7 +115,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 mt-8">
       <h3 className="text-lg font-semibold text-cyan-300">DAO Analytics Dashboard</h3>
-      
+
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 text-center">

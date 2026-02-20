@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { BrowserProvider, Contract, ethers } from 'ethers';
+import { useEffect, useState, useCallback } from 'react';
+import { BrowserProvider, Contract, ethers, EventLog } from 'ethers';
 import { GOVERNOR_ADDRESS, GOVERNOR_ABI, TREASURY_ADDRESS, TREASURY_ABI } from '../config/contracts';
 
 type Proposal = {
   id: bigint;
   description: string;
+  targets: string[];
+  values: bigint[];
+  calldatas: string[];
   state: number; // 0 Pending,1 Active,2 Canceled,3 Defeated,4 Succeeded,5 Queued,6 Expired,7 Executed
   forVotes: string;
   againstVotes: string;
@@ -26,8 +29,8 @@ export default function Governance() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if ((window as any).ethereum) {
-      const p = new BrowserProvider((window as any).ethereum);
+    if (window.ethereum) {
+      const p = new BrowserProvider(window.ethereum);
       setProvider(p);
     }
   }, []);
@@ -39,7 +42,9 @@ export default function Governance() {
       try {
         const addr = await signer.getAddress();
         setAccount(addr);
-      } catch {}
+      } catch (err) {
+        console.error("Failed to get address:", err);
+      }
       const gov = new Contract(GOVERNOR_ADDRESS, GOVERNOR_ABI, signer);
       const tre = new Contract(TREASURY_ADDRESS, TREASURY_ABI, signer);
       setGovernor(gov);
@@ -56,47 +61,72 @@ export default function Governance() {
 
   const createProposal = async () => {
     if (!governor) return;
-    const targets = [target];
-    const values = [ethers.parseEther(valueEth)];
-    const calldatas = [calldata];
-    const tx = await governor.propose(targets, values, calldatas, desc);
-    await tx.wait();
-    await refresh();
+    try {
+      const targets = [target];
+      const values = [ethers.parseEther(valueEth)];
+      const calldatas = [calldata];
+      const tx = await governor.propose(targets, values, calldatas, desc);
+      await tx.wait();
+      await refresh();
+    } catch (e: unknown) {
+      const err = e as { reason?: string; message?: string };
+      alert("Proposal failed: " + (err?.reason ?? err?.message ?? "Unknown error"));
+    }
   };
 
   const castVote = async (id: bigint, support: number) => {
     if (!governor) return;
-    const tx = await governor.castVote(id, support);
-    await tx.wait();
-  };
-
-  const refresh = async () => {
-    if (!governor) return;
-    const filter = governor.filters.ProposalCreated();
-    const events = await governor.queryFilter(filter, 0n);
-    const list: Proposal[] = [];
-    for (const ev of events) {
-      const id = ev.args?.proposalId as bigint;
-      const description = ev.args?.description as string;
-      const [againstVotes, forVotes, abstainVotes] = await governor.proposalVotes(id);
-      const state = await governor.state(id);
-      const start = await governor.proposalSnapshot(id);
-      const end = await governor.proposalDeadline(id);
-      list.push({
-        id,
-        description,
-        state: Number(state),
-        forVotes: ethers.formatEther(forVotes),
-        againstVotes: ethers.formatEther(againstVotes),
-        abstainVotes: ethers.formatEther(abstainVotes),
-        start,
-        end,
-      });
+    try {
+      const tx = await governor.castVote(id, support);
+      await tx.wait();
+      await refresh();
+    } catch (e: unknown) {
+      const err = e as { reason?: string; message?: string };
+      alert("Vote failed: " + (err?.reason ?? err?.message ?? "Unknown error"));
     }
-    setProposals(list.reverse());
   };
 
-  useEffect(() => { refresh(); }, [governor, refreshKey]);
+  const refresh = useCallback(async () => {
+    if (!governor) return;
+    try {
+      const filter = governor.filters.ProposalCreated();
+      const events = await governor.queryFilter(filter, 0n);
+      const list: Proposal[] = [];
+      for (const ev of events) {
+        const eventLog = ev as EventLog;
+        if (!eventLog.args) continue;
+
+        const id = eventLog.args.proposalId as bigint;
+        const description = eventLog.args.description as string;
+        const targets = [...eventLog.args.getValue('targets')] as string[];
+        const values = [...eventLog.args.getValue('values')] as bigint[];
+        const calldatas = [...eventLog.args.getValue('calldatas')] as string[];
+
+        const [againstVotes, forVotes, abstainVotes] = await governor.proposalVotes(id);
+        const state = await governor.state(id);
+        const start = await governor.proposalSnapshot(id);
+        const end = await governor.proposalDeadline(id);
+        list.push({
+          id,
+          description,
+          targets,
+          values,
+          calldatas,
+          state: Number(state),
+          forVotes: ethers.formatEther(forVotes),
+          againstVotes: ethers.formatEther(againstVotes),
+          abstainVotes: ethers.formatEther(abstainVotes),
+          start,
+          end,
+        });
+      }
+      setProposals(list.reverse());
+    } catch (e: unknown) {
+      console.error("Refresh failed:", e);
+    }
+  }, [governor]);
+
+  useEffect(() => { refresh(); }, [refresh, refreshKey]);
 
   // live updates via events
   useEffect(() => {
@@ -114,32 +144,43 @@ export default function Governance() {
         governor.off('ProposalQueued', onAny);
         governor.off('ProposalExecuted', onAny);
         governor.off('ProposalCanceled', onAny);
-      } catch {}
+      } catch (err) {
+        console.error("Failed to remove listener:", err);
+      }
     };
   }, [governor]);
 
   const queue = async (p: Proposal) => {
     if (!governor) return;
-    const descriptionHash = ethers.id(p.description);
-    const targets = [target];
-    const values = [ethers.parseEther(valueEth)];
-    const calldatas = [calldata];
-    const tx = await governor.queue(targets, values, calldatas, descriptionHash);
-    await tx.wait();
+    try {
+      const descriptionHash = ethers.id(p.description);
+      const tx = await governor.queue(p.targets, p.values, p.calldatas, descriptionHash);
+      await tx.wait();
+      await refresh();
+    } catch (e: unknown) {
+      const err = e as { reason?: string; message?: string };
+      alert("Queue failed: " + (err?.reason ?? err?.message ?? "Unknown error"));
+    }
   };
 
   const execute = async (p: Proposal) => {
     if (!governor) return;
-    const descriptionHash = ethers.id(p.description);
-    const targets = [target];
-    const values = [ethers.parseEther(valueEth)];
-    const calldatas = [calldata];
-    const tx = await governor.execute(targets, values, calldatas, descriptionHash);
-    await tx.wait();
+    try {
+      const descriptionHash = ethers.id(p.description);
+      const tx = await governor.execute(
+        p.targets, p.values, p.calldatas, descriptionHash,
+        { value: p.values.reduce((a, b) => a + b, 0n) }
+      );
+      await tx.wait();
+      await refresh();
+    } catch (e: unknown) {
+      const err = e as { reason?: string; message?: string };
+      alert("Execute failed: " + (err?.reason ?? err?.message ?? "Unknown error"));
+    }
   };
 
   const statusLabel = (s: number) => {
-    const map: Record<number,string> = {
+    const map: Record<number, string> = {
       0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated', 4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed'
     };
     return map[s] ?? String(s);
@@ -163,10 +204,10 @@ export default function Governance() {
       <h3 className="text-lg font-semibold text-cyan-300">Governance</h3>
       <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 space-y-3">
         <div className="grid md:grid-cols-2 gap-3">
-          <input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Target address" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded" />
-          <input value={valueEth} onChange={e=>setValueEth(e.target.value)} placeholder="ETH value" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded" />
-          <textarea value={calldata} onChange={e=>setCalldata(e.target.value)} placeholder="Calldata (0x...)" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded md:col-span-2" />
-          <input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded md:col-span-2" />
+          <input value={target} onChange={e => setTarget(e.target.value)} placeholder="Target address" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded" />
+          <input value={valueEth} onChange={e => setValueEth(e.target.value)} placeholder="ETH value" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded" />
+          <textarea value={calldata} onChange={e => setCalldata(e.target.value)} placeholder="Calldata (0x...)" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded md:col-span-2" />
+          <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" className="bg-slate-950 border border-slate-700 text-white px-2 py-2 rounded md:col-span-2" />
         </div>
         <button onClick={createProposal} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Create Proposal</button>
       </div>
@@ -209,5 +250,3 @@ export default function Governance() {
     </div>
   );
 }
-
-

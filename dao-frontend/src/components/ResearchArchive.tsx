@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Contract } from 'ethers';
-import { RESEARCH_REGISTRY_ADDRESS, RESEARCH_REGISTRY_ABI } from '../config/contracts';
+import { useState, useEffect, useCallback } from 'react';
+import { BrowserProvider } from 'ethers';
 
 interface ResearchPaper {
   id: number;
@@ -17,7 +16,7 @@ interface ResearchPaper {
   submissionFee: bigint;
 }
 
-const ResearchArchive = ({ provider, account }: { provider: any; account: string | null }) => {
+const ResearchArchive = ({ provider }: { provider: BrowserProvider | null; account: string | null }) => {
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -35,17 +34,10 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
 
   const statusLabels = ['Submitted', 'Approved', 'Rejected'];
 
-  useEffect(() => {
-    fetchPapers();
-  }, []);
-
-  const fetchPapers = async () => {
+  const fetchPapers = useCallback(async () => {
     if (!provider) return;
-    
+
     try {
-      const signer = await provider.getSigner();
-      const researchRegistry = new Contract(RESEARCH_REGISTRY_ADDRESS, RESEARCH_REGISTRY_ABI, signer);
-      
       // In a real implementation, we would fetch all papers
       // For now, we'll create sample data
       const samplePapers: ResearchPaper[] = [
@@ -78,19 +70,23 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
           submissionFee: 1000000000000000000n
         }
       ];
-      
+
       setPapers(samplePapers);
     } catch (error) {
       console.error('Error fetching papers:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [provider]);
+
+  useEffect(() => {
+    fetchPapers();
+  }, [fetchPapers]);
 
   const filteredPapers = papers.filter(paper => {
     const matchesCategory = filterCategory === 'all' || paper.category.toString() === filterCategory;
     const matchesSearch = paper.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paper.authors.some(author => author.toLowerCase().includes(searchTerm.toLowerCase()));
+      paper.authors.some(author => author.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
@@ -108,7 +104,7 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold text-cyan-300">Research Archive</h3>
-      
+
       <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div>
@@ -121,7 +117,7 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
               className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded"
             />
           </div>
-          
+
           <div>
             <label className="block text-slate-300 text-sm mb-2">Category</label>
             <select
@@ -136,7 +132,7 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
             </select>
           </div>
         </div>
-        
+
         <div className="space-y-4 mt-6">
           {filteredPapers.length === 0 ? (
             <p className="text-slate-400 text-center py-4">No research papers found.</p>
@@ -150,19 +146,18 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
                       by {paper.authors.join(', ')}
                     </p>
                   </div>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    paper.status === 0 ? 'bg-yellow-500/20 text-yellow-300' :
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${paper.status === 0 ? 'bg-yellow-500/20 text-yellow-300' :
                     paper.status === 1 ? 'bg-green-500/20 text-green-300' :
-                    'bg-red-500/20 text-red-300'
-                  }`}>
+                      'bg-red-500/20 text-red-300'
+                    }`}>
                     {statusLabels[paper.status]}
                   </span>
                 </div>
-                
+
                 <p className="text-slate-300 text-sm mt-3 line-clamp-2">
                   {paper.paperAbstract}
                 </p>
-                
+
                 <div className="flex flex-wrap gap-2 mt-3">
                   <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">
                     {categories[paper.category]}
@@ -176,11 +171,11 @@ const ResearchArchive = ({ provider, account }: { provider: any; account: string
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex gap-2 mt-4">
-                  <a 
-                    href={`https://ipfs.io/ipfs/${paper.cid}`} 
-                    target="_blank" 
+                  <a
+                    href={`https://ipfs.io/ipfs/${paper.cid}`}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-cyan-400 hover:text-cyan-300"
                   >

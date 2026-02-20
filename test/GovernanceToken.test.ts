@@ -37,17 +37,17 @@ describe("GovernanceToken", function () {
   describe("Minting", function () {
     it("Should allow owner to mint tokens", async function () {
       const { token, owner, addr1 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(addr1.address, mintAmount);
-      
+
       expect(await token.balanceOf(addr1.address)).to.equal(mintAmount);
       expect(await token.totalSupply()).to.equal(mintAmount * 2n); // 1000 initial + 1000 minted
     });
 
     it("Should fail when non-owner tries to mint", async function () {
       const { token, addr1 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       const mintAmount = hre.ethers.parseEther("1000");
       await expect(token.connect(addr1).mint(addr1.address, mintAmount))
         .to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
@@ -57,27 +57,27 @@ describe("GovernanceToken", function () {
   describe("Delegation", function () {
     it("Should allow delegation of voting power", async function () {
       const { token, owner, addr1 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       // Mint tokens to owner
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(owner.address, mintAmount);
-      
+
       // Delegate to addr1
       await token.delegate(addr1.address);
-      
+
       expect(await token.delegates(owner.address)).to.equal(addr1.address);
     });
 
     it("Should allow self-delegation", async function () {
       const { token, owner } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       // Mint tokens to owner
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(owner.address, mintAmount);
-      
+
       // Delegate to self
       await token.delegate(owner.address);
-      
+
       expect(await token.delegates(owner.address)).to.equal(owner.address);
     });
   });
@@ -85,40 +85,40 @@ describe("GovernanceToken", function () {
   describe("Voting Power", function () {
     it("Should correctly calculate voting power after delegation", async function () {
       const { token, owner, addr1 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       // Mint tokens to owner
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(owner.address, mintAmount);
-      
+
       // Check initial voting power
       expect(await token.getVotes(owner.address)).to.equal(0);
-      
+
       // Delegate voting power
       await token.delegate(owner.address);
-      
+
       // Check voting power after delegation (1000 initial + 1000 minted)
       expect(await token.getVotes(owner.address)).to.equal(mintAmount * 2n);
     });
 
     it("Should handle voting power snapshots correctly", async function () {
       const { token, owner, addr1 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       // Mint tokens to owner
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(owner.address, mintAmount);
-      
+
       // Delegate voting power
       await token.delegate(owner.address);
-      
+
       // Take snapshot
       const blockNumber = await time.latestBlock();
-      
+
       // Mint more tokens
       await token.mint(owner.address, mintAmount);
-      
+
       // Check current voting power (1000 initial + 1000 minted + 1000 minted)
       expect(await token.getVotes(owner.address)).to.equal(mintAmount * 3n);
-      
+
       // Check past voting power (1000 initial + 1000 minted)
       expect(await token.getPastVotes(owner.address, blockNumber)).to.equal(mintAmount * 2n);
     });
@@ -127,16 +127,16 @@ describe("GovernanceToken", function () {
   describe("Permit Functionality", function () {
     it("Should allow permit functionality for gasless approvals", async function () {
       const { token, owner, addr1, addr2 } = await loadFixture(deployGovernanceTokenFixture);
-      
+
       // Mint tokens to owner
       const mintAmount = hre.ethers.parseEther("1000");
       await token.mint(owner.address, mintAmount);
-      
+
       // Create permit signature
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
       const nonce = await token.nonces(owner.address);
       const value = hre.ethers.parseEther("100");
-      
+
       // Create the permit message
       const domain = {
         name: await token.name(),
@@ -144,7 +144,7 @@ describe("GovernanceToken", function () {
         chainId: (await hre.ethers.provider.getNetwork()).chainId,
         verifyingContract: await token.getAddress(),
       };
-      
+
       const types = {
         Permit: [
           { name: "owner", type: "address" },
@@ -154,7 +154,7 @@ describe("GovernanceToken", function () {
           { name: "deadline", type: "uint256" },
         ],
       };
-      
+
       const message = {
         owner: owner.address,
         spender: addr1.address,
@@ -162,16 +162,53 @@ describe("GovernanceToken", function () {
         nonce: nonce,
         deadline: deadline,
       };
-      
+
       // Sign the permit
       const signature = await owner.signTypedData(domain, types, message);
       const { v, r, s } = ethers.Signature.from(signature);
-      
+
       // Execute permit
       await token.permit(owner.address, addr1.address, value, deadline, v, r, s);
-      
+
       // Check allowance
       expect(await token.allowance(owner.address, addr1.address)).to.equal(value);
+    });
+  });
+
+  describe("Pausable Functionality", function () {
+    it("Should allow owner to pause and unpause", async function () {
+      const { token, owner, addr1 } = await loadFixture(deployGovernanceTokenFixture);
+
+      // Pause the contract
+      await expect(token.connect(owner).pause())
+        .to.emit(token, "Paused")
+        .withArgs(owner.address);
+
+      expect(await token.paused()).to.be.true;
+
+      // Transfer should revert when paused
+      await expect(token.connect(owner).transfer(addr1.address, 10))
+        .to.be.revertedWithCustomError(token, "EnforcedPause");
+
+      // Unpause the contract
+      await expect(token.connect(owner).unpause())
+        .to.emit(token, "Unpaused")
+        .withArgs(owner.address);
+
+      expect(await token.paused()).to.be.false;
+
+      // Transfer should work when unpaused
+      await expect(token.connect(owner).transfer(addr1.address, 10)).to.not.be.reverted;
+    });
+
+    it("Should revert if non-owner tries to pause or unpause", async function () {
+      const { token, addr1 } = await loadFixture(deployGovernanceTokenFixture);
+
+      await expect(token.connect(addr1).pause())
+        .to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+
+      await expect(token.connect(addr1).unpause())
+        .to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
     });
   });
 });

@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol"; 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReputationManager} from "./ReputationManager.sol";
 
 /**
  * Research Registry - stores research papers submitted to the DAO
@@ -31,6 +32,7 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
     uint256 private _paperIds;
     uint256 public submissionFee; // Configurable fee in wei
     address public governanceToken; // Token used for submission fee
+    ReputationManager public reputationManager;
     
     mapping(uint256 => ResearchPaper) public papers;
     mapping(uint256 => uint256) public paperIdToProposalId; // paperId => proposalId
@@ -87,7 +89,7 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
         if (submissionFee > 0) {
             require(
                 IERC20(governanceToken).transferFrom(
-                    msg.sender, 
+                    msg.sender,
                     address(this),
                     submissionFee
                 ),
@@ -116,6 +118,10 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
         
         emit PaperSubmitted(newPaperId, msg.sender, _title, _cid, _hash);
         
+        if (address(reputationManager) != address(0)) {
+            try reputationManager.addSubmissionPoints(msg.sender) {} catch {}
+        }
+
         return newPaperId;
     }
     
@@ -148,6 +154,10 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
         paper.status = PaperStatus.Approved;
         
         emit PaperApproved(_paperId, paper.proposalId, msg.sender);
+
+        if (address(reputationManager) != address(0)) {
+            try reputationManager.addReviewPoints(msg.sender) {} catch {}
+        }
     }
     
     /**
@@ -173,6 +183,10 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
         submissionFee = _newFee;
         emit SubmissionFeeSet(_newFee);
     }
+
+    function setReputationManager(ReputationManager _reputationManager) external onlyOwner {
+        reputationManager = _reputationManager;
+    }
     
     /**
      * @dev Get a paper by its ID
@@ -188,8 +202,16 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
      * @param _user Address of the user
      * @return Array of paper IDs
      */
-    function getPapersByUser(address _user) external view returns (uint256[] memory) {
-        return userPapers[_user];
+    function getPapersByUser(address _user, uint256 offset, uint256 limit) external view returns (uint256[] memory) {
+        uint256[] storage allPapers = userPapers[_user];
+        uint256 total = allPapers.length;
+        if (offset >= total) return new uint256[](0);
+        uint256 end = offset + limit > total ? total : offset + limit;
+        uint256[] memory page = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; i++) {
+            page[i - offset] = allPapers[i];
+        }
+        return page;
     }
     
     /**
@@ -199,6 +221,4 @@ contract ResearchRegistry is Ownable, ReentrancyGuard {
     function getTotalPapers() external view returns (uint256) {
         return _paperIds;
     }
-
 }
-

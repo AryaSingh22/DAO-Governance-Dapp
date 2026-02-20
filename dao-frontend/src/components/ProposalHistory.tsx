@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BrowserProvider, Contract, ethers } from 'ethers';
+import { useEffect, useState, useCallback } from 'react';
+import { BrowserProvider, Contract, ethers, EventLog } from 'ethers';
 import { GOVERNOR_ADDRESS, GOVERNOR_ABI } from '../config/contracts';
 
 type ProposalHistory = {
@@ -42,8 +42,8 @@ export default function ProposalHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if ((window as any).ethereum) {
-      const p = new BrowserProvider((window as any).ethereum);
+    if (window.ethereum) {
+      const p = new BrowserProvider(window.ethereum);
       setProvider(p);
     }
   }, []);
@@ -57,7 +57,29 @@ export default function ProposalHistory() {
     })();
   }, [provider]);
 
-  const loadProposals = async () => {
+  const calculateAnalytics = useCallback((proposalList: ProposalHistory[]) => {
+    const total = proposalList.length;
+    const executed = proposalList.filter(p => p.state === 7).length;
+    const defeated = proposalList.filter(p => p.state === 3).length;
+    const active = proposalList.filter(p => p.state === 1).length;
+
+    const totalVotes = proposalList.reduce((sum, p) => {
+      return sum + parseFloat(p.forVotes) + parseFloat(p.againstVotes) + parseFloat(p.abstainVotes);
+    }, 0);
+
+    const avgParticipation = total > 0 ? totalVotes / total : 0;
+
+    setAnalytics({
+      totalProposals: total,
+      executedProposals: executed,
+      defeatedProposals: defeated,
+      activeProposals: active,
+      averageParticipation: avgParticipation,
+      totalVotes: totalVotes
+    });
+  }, []);
+
+  const loadProposals = useCallback(async () => {
     if (!governor) return;
     setLoading(true);
 
@@ -67,13 +89,15 @@ export default function ProposalHistory() {
       const list: ProposalHistory[] = [];
 
       for (const ev of events) {
-        const id = ev.args?.proposalId as bigint;
-        const description = ev.args?.description as string;
+        const eventLog = ev as EventLog;
+        if (!eventLog.args) continue;
+        const id = eventLog.args.proposalId as bigint;
+        const description = eventLog.args.description as string;
         const [againstVotes, forVotes, abstainVotes] = await governor.proposalVotes(id);
         const state = await governor.state(id);
         const start = await governor.proposalSnapshot(id);
         const end = await governor.proposalDeadline(id);
-        
+
         // Get metadata if available
         let title = `Proposal ${id.toString()}`;
         let category = 0;
@@ -88,7 +112,7 @@ export default function ProposalHistory() {
           createdAt = Number(metadata.createdAt);
           executed = metadata.executed;
           canceled = metadata.canceled;
-        } catch (e) {
+        } catch {
           // Metadata not available, use defaults
         }
 
@@ -116,36 +140,14 @@ export default function ProposalHistory() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateAnalytics = (proposalList: ProposalHistory[]) => {
-    const total = proposalList.length;
-    const executed = proposalList.filter(p => p.state === 7).length;
-    const defeated = proposalList.filter(p => p.state === 3).length;
-    const active = proposalList.filter(p => p.state === 1).length;
-    
-    const totalVotes = proposalList.reduce((sum, p) => {
-      return sum + parseFloat(p.forVotes) + parseFloat(p.againstVotes) + parseFloat(p.abstainVotes);
-    }, 0);
-
-    const avgParticipation = total > 0 ? totalVotes / total : 0;
-
-    setAnalytics({
-      totalProposals: total,
-      executedProposals: executed,
-      defeatedProposals: defeated,
-      activeProposals: active,
-      averageParticipation: avgParticipation,
-      totalVotes: totalVotes
-    });
-  };
+  }, [governor, calculateAnalytics]);
 
   useEffect(() => {
     loadProposals();
-  }, [governor]);
+  }, [loadProposals]);
 
   const statusLabel = (s: number) => {
-    const map: Record<number,string> = {
+    const map: Record<number, string> = {
       0: 'Pending', 1: 'Active', 2: 'Canceled', 3: 'Defeated', 4: 'Succeeded', 5: 'Queued', 6: 'Expired', 7: 'Executed'
     };
     return map[s] ?? String(s);
@@ -193,7 +195,7 @@ export default function ProposalHistory() {
   return (
     <div className="space-y-6 mt-8">
       <h3 className="text-lg font-semibold text-cyan-300">Proposal History & Analytics</h3>
-      
+
       {/* Analytics Dashboard */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 text-center">
@@ -243,9 +245,9 @@ export default function ProposalHistory() {
                 <div>Created: {formatDate(p.createdAt)}</div>
               </div>
             </div>
-            
+
             <p className="text-slate-300 mb-3">{p.description}</p>
-            
+
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div className="text-center">
                 <div className="text-lg font-semibold text-green-400">{p.forVotes}</div>
@@ -260,7 +262,7 @@ export default function ProposalHistory() {
                 <div className="text-xs text-slate-400">Abstain Votes</div>
               </div>
             </div>
-            
+
             <div className="text-xs text-slate-400">
               Snapshot: {p.start.toString()} • Deadline: {p.end.toString()}
             </div>

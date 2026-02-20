@@ -21,8 +21,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'governance' | 'history' | 'token' | 'research' | 'reputation'>('dashboard')
 
   useEffect(() => {
-    if ((window as any).ethereum) {
-      const p = new BrowserProvider((window as any).ethereum)
+    if (window.ethereum) {
+      const p = new BrowserProvider(window.ethereum)
       setProvider(p)
     }
   }, [])
@@ -34,7 +34,9 @@ function App() {
       try {
         const addr = await signer.getAddress()
         setAccount(addr)
-      } catch {}
+      } catch (err) {
+        console.error("Failed to get address:", err);
+      }
       const t = new Contract(TOKEN_ADDRESS, TOKEN_ABI, signer)
       setToken(t)
     })()
@@ -51,12 +53,12 @@ function App() {
   }, [token, account])
 
   const connectWallet = async () => {
-    if (!(window as any).ethereum) {
+    if (!window.ethereum) {
       alert('Please install MetaMask!')
       return
     }
     try {
-      await (window as any).ethereum.request({ method: 'eth_requestAccounts' })
+      await window.ethereum.request({ method: 'eth_requestAccounts' })
       window.location.reload()
     } catch (error) {
       console.error('Error connecting wallet:', error)
@@ -87,12 +89,11 @@ function App() {
 
   const TabButton = ({ id, label, icon }: { id: string; label: string; icon: string }) => (
     <button
-      onClick={() => setActiveTab(id as any)}
-      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-        activeTab === id
+      onClick={() => setActiveTab(id as 'dashboard' | 'governance' | 'history' | 'token' | 'research' | 'reputation')}
+      className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === id
           ? 'bg-cyan-600 text-white'
           : 'text-slate-300 hover:text-white hover:bg-slate-700'
-      }`}
+        }`}
     >
       <span className="mr-2">{icon}</span>
       {label}
@@ -157,13 +158,13 @@ function App() {
             {activeTab === 'token' && (
               <div className="space-y-6 mt-8">
                 <h3 className="text-lg font-semibold text-cyan-300">Token Management</h3>
-                
+
                 <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800 space-y-4">
                   <div>
                     <p className="text-slate-400 text-sm">Your Voting Power</p>
                     <p className="text-cyan-300 font-semibold">{delegatedTo} TDT</p>
                   </div>
-                  
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-slate-400 text-sm mb-2">Delegate to Address</label>
@@ -183,7 +184,7 @@ function App() {
                       </button>
                     </div>
                   </div>
-                  
+
                   <div className="pt-4 border-t border-slate-700">
                     <button
                       onClick={mintTokens}

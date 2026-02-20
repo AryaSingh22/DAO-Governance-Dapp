@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24; 
- 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";  
+pragma solidity ^0.8.24;
+
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
@@ -9,7 +10,8 @@ import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/
  * Reputation Manager - tracks user contributions and awards NFT badges
  * Handles reputation points for submissions, votes, and reviews
  */
-contract ReputationManager is ERC721, ERC721URIStorage, Ownable { 
+contract ReputationManager is ERC721, ERC721URIStorage, Ownable, AccessControl {
+    bytes32 public constant REPUTATION_MANAGER_ROLE = keccak256("REPUTATION_MANAGER_ROLE");
     struct BadgeTier {
         string name;
         string description;
@@ -26,11 +28,13 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
     }
     
     uint256 private _badgeIds;
+    uint256 private _badgeTokenIds; // Auto-incrementing token IP counter
     string public baseTokenURI;
     
     mapping(uint256 => BadgeTier) public badgeTiers;
     mapping(address => UserReputation) public userReputations;
     mapping(address => uint256[]) public userBadges; // user => badgeIds
+    mapping(address => uint256) public nextBadgeIdToCheck; // user => next badge ID to check
     
     // Predefined badge tiers
     uint256 public constant RESEARCHER_BADGE = 1;
@@ -48,6 +52,12 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
         string memory initialBaseURI
     ) ERC721(name, symbol) Ownable(msg.sender) {
         baseTokenURI = initialBaseURI;
+        
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        // IMPORTANT: REPUTATION_MANAGER_ROLE must be granted post-deployment to:
+        // - MyGovernor address (for voting points)
+        // - ResearchRegistry address (for submission and review points)
+        // This is handled in ignition/modules/Governance.ts
         
         // Create default badge tiers
         _createBadgeTier("Researcher", "Submitted first research paper", 100, "ipfs://researcher.json");
@@ -99,7 +109,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
      * @param _points Number of points to add
      * @param _reason Reason for adding points
      */
-    function addPoints(address _user, uint256 _points, string memory _reason) external onlyOwner {
+    function addPoints(address _user, uint256 _points, string memory _reason) external onlyRole(REPUTATION_MANAGER_ROLE) {
         userReputations[_user].totalPoints += _points;
         emit PointsAdded(_user, _points, _reason);
         
@@ -111,7 +121,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
      * @dev Add points for paper submission
      * @param _user Address of the user
      */
-    function addSubmissionPoints(address _user) external onlyOwner {
+    function addSubmissionPoints(address _user) external onlyRole(REPUTATION_MANAGER_ROLE) {
         userReputations[_user].totalPoints += 50;
         userReputations[_user].submissions += 1;
         emit PointsAdded(_user, 50, "Paper submission");
@@ -124,7 +134,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
      * @dev Add points for voting
      * @param _user Address of the user
      */
-    function addVotingPoints(address _user) external onlyOwner {
+    function addVotingPoints(address _user) external onlyRole(REPUTATION_MANAGER_ROLE) {
         userReputations[_user].totalPoints += 10;
         userReputations[_user].votes += 1;
         emit PointsAdded(_user, 10, "Voting on proposal");
@@ -137,7 +147,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
      * @dev Add points for reviewing papers
      * @param _user Address of the user
      */
-    function addReviewPoints(address _user) external onlyOwner {
+    function addReviewPoints(address _user) external onlyRole(REPUTATION_MANAGER_ROLE) {
         userReputations[_user].totalPoints += 25;
         userReputations[_user].reviews += 1;
         emit PointsAdded(_user, 25, "Reviewing paper");
@@ -154,18 +164,25 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
         UserReputation storage userRep = userReputations[_user];
         uint256 points = userRep.totalPoints;
         
-        // Check each badge tier
-        for (uint256 i = 1; i <= _badgeIds; i++) {
-            BadgeTier storage badge = badgeTiers[i];
+        uint256 currentId = nextBadgeIdToCheck[_user];
+        if (currentId == 0) currentId = 1; // Start at 1 if 0
+
+        // Check badge tiers sequentially
+        while (currentId <= _badgeIds) {
+            BadgeTier storage badge = badgeTiers[currentId];
             
-            // Skip if user already has this badge
-            if (userRep.badges[i]) continue;
-            
-            // Award badge if user has enough points
+            // Allow for unordered execution if badge tiers are not strictly ordered by points, 
+            // but the request assumes strict ordering. We will check points.
             if (points >= badge.pointsRequired) {
-                _awardBadge(_user, i);
+                if (!userRep.badges[currentId]) {
+                    _awardBadge(_user, currentId);
+                }
+                currentId++;
+            } else {
+                break; // Stop checking if not enough points for this tier
             }
         }
+        nextBadgeIdToCheck[_user] = currentId;
     }
     
     /**
@@ -177,8 +194,11 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
         BadgeTier storage badge = badgeTiers[_badgeId];
         
         // Mint the badge NFT
-        _safeMint(_user, _badgeId);
-        _setTokenURI(_badgeId, badge.tokenURI);
+        _badgeTokenIds++;
+        uint256 newTokenId = _badgeTokenIds;
+
+        _safeMint(_user, newTokenId);
+        _setTokenURI(newTokenId, badge.tokenURI);
         
         // Mark user as having this badge
         userReputations[_user].badges[_badgeId] = true;
@@ -250,16 +270,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable {
         return super.tokenURI(tokenId);
     }
     
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
-
 }
-
-
-
-
-
-
-
-
