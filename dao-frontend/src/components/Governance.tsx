@@ -55,15 +55,18 @@ export default function Governance() {
   useEffect(() => {
     if (!treasury) return;
     const iface = treasury.interface;
-    const data = iface.encodeFunctionData('releaseETH', [account ?? ethers.ZeroAddress, 0n]);
+    const data = iface.encodeFunctionData('releaseETH', [
+      account ?? ethers.ZeroAddress,
+      ethers.parseEther(valueEth || '0')
+    ]);
     setCalldata(data);
-  }, [treasury, account]);
+  }, [treasury, account, valueEth]);
 
   const createProposal = async () => {
     if (!governor) return;
     try {
       const targets = [target];
-      const values = [ethers.parseEther(valueEth)];
+      const values = [target.toLowerCase() === TREASURY_ADDRESS.toLowerCase() ? 0n : ethers.parseEther(valueEth || '0')];
       const calldatas = [calldata];
       const tx = await governor.propose(targets, values, calldatas, desc);
       await tx.wait();
@@ -230,7 +233,7 @@ export default function Governance() {
               <div>Against: {p.againstVotes}</div>
               <div>Abstain: {p.abstainVotes}</div>
             </div>
-            <div className="text-slate-400 text-xs mt-1">Snapshot: {p.start.toString()} • Deadline: {p.end.toString()}</div>
+            <div className="text-slate-400 text-xs mt-1">Snapshot: {p.start.toString()} / Deadline: {p.end.toString()}</div>
             <div className="flex gap-2 mt-3">
               <button onClick={() => castVote(p.id, 1)} className="bg-green-700 text-white px-3 py-1 rounded">Vote For</button>
               <button onClick={() => castVote(p.id, 0)} className="bg-red-700 text-white px-3 py-1 rounded">Vote Against</button>

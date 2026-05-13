@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { BrowserProvider } from 'ethers';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BrowserProvider, Contract } from 'ethers';
+import {
+  isConfiguredAddress,
+  REPUTATION_MANAGER_ABI,
+  REPUTATION_MANAGER_ADDRESS,
+} from '../config/contracts';
 
 interface UserReputation {
   totalPoints: number;
@@ -13,67 +18,76 @@ interface Badge {
   name: string;
   description: string;
   pointsRequired: number;
+  tokenURI: string;
   earned: boolean;
 }
 
-interface LeaderboardEntry {
-  address: string | null;
-  points: number;
-}
-
-const defaultBadges: Badge[] = [
-  { id: 1, name: 'Researcher', description: 'Submitted first research paper', pointsRequired: 100, earned: false },
-  { id: 2, name: 'Contributor', description: 'Active community contributor', pointsRequired: 500, earned: false },
-  { id: 3, name: 'Expert', description: 'Recognized domain expert', pointsRequired: 1000, earned: false },
-  { id: 4, name: 'Visionary', description: 'DAO visionary and leader', pointsRequired: 2000, earned: false }
+const fallbackBadges: Badge[] = [
+  { id: 1, name: 'Researcher', description: 'Submitted first research paper', pointsRequired: 100, tokenURI: 'researcher.json', earned: false },
+  { id: 2, name: 'Contributor', description: 'Active community contributor', pointsRequired: 500, tokenURI: 'contributor.json', earned: false },
+  { id: 3, name: 'Expert', description: 'Recognized domain expert', pointsRequired: 1000, tokenURI: 'expert.json', earned: false },
+  { id: 4, name: 'Visionary', description: 'DAO visionary and leader', pointsRequired: 2000, tokenURI: 'visionary.json', earned: false },
 ];
 
+const emptyReputation = {
+  totalPoints: 0,
+  submissions: 0,
+  votes: 0,
+  reviews: 0,
+};
+
 const ReputationBadges = ({ provider, account }: { provider: BrowserProvider | null; account: string | null }) => {
-  const [reputation, setReputation] = useState<UserReputation>({
-    totalPoints: 0,
-    submissions: 0,
-    votes: 0,
-    reviews: 0
-  });
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [reputation, setReputation] = useState<UserReputation>(emptyReputation);
+  const [badges, setBadges] = useState<Badge[]>(fallbackBadges);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchReputationData = useCallback(async () => {
-    if (!provider || !account) return;
+    if (!provider || !account || !isConfiguredAddress(REPUTATION_MANAGER_ADDRESS)) {
+      setReputation(emptyReputation);
+      setBadges(fallbackBadges);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
 
     try {
-      // In a real implementation, we would fetch actual data
-      // For now, we'll use sample data
-      const sampleReputation: UserReputation = {
-        totalPoints: 350,
-        submissions: 2,
-        votes: 15,
-        reviews: 3
-      };
+      const signer = await provider.getSigner();
+      const reputationManager = new Contract(REPUTATION_MANAGER_ADDRESS, REPUTATION_MANAGER_ABI, signer);
+      const [totalPoints, submissions, votes, reviews] = await reputationManager.getUserReputation(account);
+      const earnedBadgeIds = new Set((await reputationManager.getUserBadges(account)).map((id: bigint) => Number(id)));
 
-      setReputation(sampleReputation);
-
-      // Update badges based on points
-      const updatedBadges = defaultBadges.map(badge => ({
-        ...badge,
-        earned: sampleReputation.totalPoints >= badge.pointsRequired
+      const loadedBadges = await Promise.all(fallbackBadges.map(async (fallback) => {
+        try {
+          const details = await reputationManager.getBadgeDetails(fallback.id);
+          return {
+            id: fallback.id,
+            name: details.name ?? details[0],
+            description: details.description ?? details[1],
+            pointsRequired: Number(details.pointsRequired ?? details[2]),
+            tokenURI: details.tokenURI ?? details[3],
+            earned: earnedBadgeIds.has(fallback.id),
+          };
+        } catch {
+          return {
+            ...fallback,
+            earned: earnedBadgeIds.has(fallback.id),
+          };
+        }
       }));
 
-      setBadges(updatedBadges);
-
-      // Sample leaderboard data
-      const sampleLeaderboard = [
-        { address: '0x1234...5678', points: 1250 },
-        { address: '0x9876...5432', points: 980 },
-        { address: '0xabcd...ef01', points: 760 },
-        { address: '0x2468...1357', points: 620 },
-        { address: account, points: sampleReputation.totalPoints }
-      ].sort((a, b) => b.points - a.points);
-
-      setLeaderboard(sampleLeaderboard);
-    } catch (error) {
-      console.error('Error fetching reputation data:', error);
+      setReputation({
+        totalPoints: Number(totalPoints),
+        submissions: Number(submissions),
+        votes: Number(votes),
+        reviews: Number(reviews),
+      });
+      setBadges(loadedBadges);
+    } catch (fetchError) {
+      console.error('Error fetching reputation data:', fetchError);
+      setError('Unable to read the reputation manager on this network.');
     } finally {
       setLoading(false);
     }
@@ -83,119 +97,92 @@ const ReputationBadges = ({ provider, account }: { provider: BrowserProvider | n
     fetchReputationData();
   }, [fetchReputationData]);
 
+  const progress = useMemo(() => {
+    const nextBadge = badges.find((badge) => !badge.earned);
+    if (!nextBadge) return 100;
+    return Math.min(100, Math.round((reputation.totalPoints / nextBadge.pointsRequired) * 100));
+  }, [badges, reputation.totalPoints]);
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-cyan-300">Reputation & Badges</h3>
-        <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800">
-          <p className="text-slate-300">Loading reputation data...</p>
-        </div>
+      <div className="rounded-lg border border-white/10 bg-white/[0.05] p-6">
+        <p className="text-sm text-slate-300">Loading reputation data...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-cyan-300">Reputation & Badges</h3>
-
-      {/* Reputation Stats */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
-          <p className="text-slate-400 text-sm">Total Points</p>
-          <p className="text-2xl font-bold text-cyan-300">{reputation.totalPoints}</p>
+      {!isConfiguredAddress(REPUTATION_MANAGER_ADDRESS) && (
+        <div className="rounded-lg border border-amber-200/20 bg-amber-200/10 p-4 text-sm text-amber-50">
+          Configure VITE_REPUTATION_MANAGER_ADDRESS after deployment to enable live points and badges.
         </div>
+      )}
 
-        <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
-          <p className="text-slate-400 text-sm">Papers Submitted</p>
-          <p className="text-2xl font-bold text-green-400">{reputation.submissions}</p>
+      {error && (
+        <div className="rounded-lg border border-rose-200/20 bg-rose-200/10 p-4 text-sm text-rose-50">
+          {error}
         </div>
+      )}
 
-        <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
-          <p className="text-slate-400 text-sm">Votes Cast</p>
-          <p className="text-2xl font-bold text-purple-400">{reputation.votes}</p>
+      <section className="rounded-lg border border-white/10 bg-white/[0.05] p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Contributor reputation</p>
+            <h3 className="mt-1 text-3xl font-bold text-white">{reputation.totalPoints.toLocaleString()} pts</h3>
+          </div>
+          <button onClick={fetchReputationData} className="h-10 rounded-lg border border-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+            Refresh
+          </button>
         </div>
-
-        <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
-          <p className="text-slate-400 text-sm">Reviews</p>
-          <p className="text-2xl font-bold text-yellow-400">{reputation.reviews}</p>
+        <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-900">
+          <div className="h-full rounded-full bg-cyan-300 transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
-      </div>
+      </section>
 
-      {/* Badges */}
-      <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800">
-        <h4 className="text-md font-semibold text-cyan-300 mb-4">Your Badges</h4>
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          ['Papers submitted', reputation.submissions, 'text-emerald-200'],
+          ['Votes cast', reputation.votes, 'text-indigo-200'],
+          ['Reviews', reputation.reviews, 'text-amber-200'],
+          ['Badges earned', badges.filter((badge) => badge.earned).length, 'text-cyan-200'],
+        ].map(([label, value, color]) => (
+          <div key={label as string} className="rounded-lg border border-white/10 bg-white/[0.05] p-4">
+            <p className="text-sm text-slate-400">{label}</p>
+            <p className={`mt-2 text-2xl font-bold ${color}`}>{Number(value).toLocaleString()}</p>
+          </div>
+        ))}
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {badges.map((badge) => (
-            <div
-              key={badge.id}
-              className={`p-4 rounded-lg border ${badge.earned
-                ? 'bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border-cyan-700'
-                : 'bg-slate-800/50 border-slate-700'
+      <section className="rounded-lg border border-white/10 bg-white/[0.05] p-6">
+        <h4 className="text-lg font-bold text-white">Badge ladder</h4>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {badges.map((badge) => {
+            const remaining = Math.max(0, badge.pointsRequired - reputation.totalPoints);
+            return (
+              <article
+                key={badge.id}
+                className={`rounded-lg border p-4 transition duration-200 ${
+                  badge.earned
+                    ? 'border-cyan-200/30 bg-cyan-200/10'
+                    : 'border-white/10 bg-slate-950/45'
                 }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${badge.earned
-                  ? 'bg-gradient-to-br from-cyan-500 to-blue-500'
-                  : 'bg-slate-700'
-                  }`}>
-                  <span className="text-lg">🏆</span>
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h5 className="font-bold text-white">{badge.name}</h5>
+                    <p className="mt-1 text-sm leading-6 text-slate-300">{badge.description}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge.earned ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-300'}`}>
+                    {badge.earned ? 'Earned' : `${remaining} left`}
+                  </span>
                 </div>
-
-                <div>
-                  <h5 className={`font-semibold ${badge.earned ? 'text-cyan-300' : 'text-slate-400'
-                    }`}>
-                    {badge.name}
-                  </h5>
-                  <p className={`text-sm ${badge.earned ? 'text-slate-300' : 'text-slate-500'
-                    }`}>
-                    {badge.description}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {badge.earned
-                      ? 'Earned!'
-                      : `${badge.pointsRequired - reputation.totalPoints} points needed`
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
+                <p className="mt-3 text-xs text-slate-500">{badge.pointsRequired.toLocaleString()} point threshold</p>
+              </article>
+            );
+          })}
         </div>
-      </div>
-
-      {/* Leaderboard */}
-      <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800">
-        <h4 className="text-md font-semibold text-cyan-300 mb-4">Leaderboard</h4>
-
-        <div className="space-y-3">
-          {leaderboard.map((user, index) => (
-            <div
-              key={index}
-              className={`flex items-center justify-between p-3 rounded-lg ${user.address === account
-                ? 'bg-cyan-900/20 border border-cyan-800'
-                : 'bg-slate-800/50'
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-500 text-yellow-900' :
-                  index === 1 ? 'bg-gray-400 text-gray-900' :
-                    index === 2 ? 'bg-amber-800 text-amber-100' :
-                      'bg-slate-700 text-slate-300'
-                  }`}>
-                  {index + 1}
-                </span>
-                <span className="font-mono text-sm">
-                  {user.address === account ? 'You' : user.address}
-                </span>
-              </div>
-              <span className="font-semibold text-cyan-300">
-                {user.points} pts
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
     </div>
   );
 };

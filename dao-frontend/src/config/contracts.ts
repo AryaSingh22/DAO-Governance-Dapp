@@ -1,11 +1,17 @@
-// Fill these with deployed addresses from Ignition output
-export const GOVERNOR_ADDRESS = "0x59b670e9fA9D0A427751Af201D676719a970857b";
-export const TIMELOCK_ADDRESS = "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d";
-export const TREASURY_ADDRESS = "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1";
-export const TOKEN_ADDRESS = "0x68B1D87F95878fE05B998F19b66F4baba5De1aed";
-export const MEMBERSHIP_NFT_ADDRESS = "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c";
-export const RESEARCH_REGISTRY_ADDRESS = "0x0000000000000000000000000000000000000000"; // To be deployed
-export const REPUTATION_MANAGER_ADDRESS = "0x0000000000000000000000000000000000000000"; // To be deployed
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const configuredAddress = (key: string, fallback: string) =>
+  (import.meta.env[key] as string | undefined) || fallback;
+
+export const isConfiguredAddress = (address: string) => Boolean(address) && address !== ZERO_ADDRESS;
+
+export const GOVERNOR_ADDRESS = configuredAddress("VITE_GOVERNOR_ADDRESS", "0x59b670e9fA9D0A427751Af201D676719a970857b");
+export const TIMELOCK_ADDRESS = configuredAddress("VITE_TIMELOCK_ADDRESS", "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d");
+export const TREASURY_ADDRESS = configuredAddress("VITE_TREASURY_ADDRESS", "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1");
+export const TOKEN_ADDRESS = configuredAddress("VITE_TOKEN_ADDRESS", "0x68B1D87F95878fE05B998F19b66F4baba5De1aed");
+export const MEMBERSHIP_NFT_ADDRESS = configuredAddress("VITE_MEMBERSHIP_NFT_ADDRESS", "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c");
+export const RESEARCH_REGISTRY_ADDRESS = configuredAddress("VITE_RESEARCH_REGISTRY_ADDRESS", ZERO_ADDRESS);
+export const REPUTATION_MANAGER_ADDRESS = configuredAddress("VITE_REPUTATION_MANAGER_ADDRESS", ZERO_ADDRESS);
 
 export const GOVERNOR_ABI = [
   {
@@ -44,7 +50,8 @@ export const GOVERNOR_ABI = [
       { "indexed": false, "internalType": "string", "name": "title", "type": "string" },
       { "indexed": false, "internalType": "string", "name": "description", "type": "string" },
       { "indexed": false, "internalType": "string", "name": "ipfsCID", "type": "string" },
-      { "indexed": false, "internalType": "uint8", "name": "category", "type": "uint8" }
+      { "indexed": false, "internalType": "uint8", "name": "category", "type": "uint8" },
+      { "indexed": false, "internalType": "uint8", "name": "votingMode", "type": "uint8" }
     ], "name": "ProposalMetadataSet", "type": "event"
   },
   {
@@ -81,6 +88,7 @@ export const GOVERNOR_ABI = [
       { "internalType": "string", "name": "description", "type": "string" },
       { "internalType": "string", "name": "ipfsCID", "type": "string" },
       { "internalType": "uint8", "name": "category", "type": "uint8" },
+      { "internalType": "uint8", "name": "votingMode", "type": "uint8" },
       { "internalType": "uint256", "name": "linkedPaperId", "type": "uint256" }
     ], "name": "proposeWithMetadata", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "nonpayable", "type": "function"
   },
@@ -188,6 +196,8 @@ export const TREASURY_ABI = [
 export const TOKEN_ABI = [
   { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
   { "inputs": [{ "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "mint", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "spender", "type": "address" }, { "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "approve", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "owner", "type": "address" }, { "internalType": "address", "name": "spender", "type": "address" }], "name": "allowance", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "delegatee", "type": "address" }], "name": "delegate", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "account", "type": "address" }], "name": "getVotes", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "account", "type": "address" }], "name": "balanceOf", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },

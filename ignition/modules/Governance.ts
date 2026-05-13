@@ -47,7 +47,7 @@ const GovernanceModule = buildModule("GovernanceModule", (m) => {
   // Set up Timelock roles
   const PROPOSER_ROLE = m.staticCall(timelock, "PROPOSER_ROLE", []);
   const EXECUTOR_ROLE = m.staticCall(timelock, "EXECUTOR_ROLE", []);
-  const TIMELOCK_ADMIN_ROLE = m.staticCall(timelock, "TIMELOCK_ADMIN_ROLE", []);
+  const DEFAULT_ADMIN_ROLE = m.staticCall(timelock, "DEFAULT_ADMIN_ROLE", []);
 
   m.call(timelock, "grantRole", [PROPOSER_ROLE, governor], { id: "grantProposerRole" });
   // Allow anyone to execute by giving executor role to address(0)
@@ -72,7 +72,7 @@ const GovernanceModule = buildModule("GovernanceModule", (m) => {
   m.call(governor, "setGuardian", [m.getAccount(0)], { id: "setGovernorGuardian" });
 
   // Renounce Timelock Admin role (optional for testnet, usually done at end)
-  m.call(timelock, "renounceRole", [TIMELOCK_ADMIN_ROLE, m.getAccount(0)], { id: "renounceTimelockAdmin" });
+  m.call(timelock, "renounceRole", [DEFAULT_ADMIN_ROLE, m.getAccount(0)], { id: "renounceTimelockAdmin" });
 
   return { token, timelock, governor, treasury, membershipNFT, researchRegistry, reputationManager };
 });

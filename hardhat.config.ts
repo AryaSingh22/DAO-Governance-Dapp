@@ -14,7 +14,7 @@ const config: HardhatUserConfig = {
       evmVersion: "cancun",
       optimizer: {
         enabled: true,
-        runs: 10000 // Increased optimizer runs to reduce contract size
+        runs: 200
       },
       viaIR: true // Enable IR optimization
     }

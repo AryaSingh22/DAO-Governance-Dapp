@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { BrowserProvider } from 'ethers';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BrowserProvider, Contract, ethers } from 'ethers';
+import {
+  isConfiguredAddress,
+  RESEARCH_REGISTRY_ABI,
+  RESEARCH_REGISTRY_ADDRESS,
+} from '../config/contracts';
 
 interface ResearchPaper {
   id: number;
@@ -16,64 +21,69 @@ interface ResearchPaper {
   submissionFee: bigint;
 }
 
+const categories = [
+  'Computer Science',
+  'Biology',
+  'Physics',
+  'Chemistry',
+  'Mathematics',
+  'Economics',
+  'Other',
+];
+
+const statusLabels = ['Submitted', 'Approved', 'Rejected'];
+
+const statusClass = (status: number) => [
+  'border-amber-300/20 bg-amber-300/10 text-amber-100',
+  'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+  'border-rose-300/20 bg-rose-300/10 text-rose-100',
+][status] || 'border-slate-300/20 bg-slate-300/10 text-slate-100';
+
 const ResearchArchive = ({ provider }: { provider: BrowserProvider | null; account: string | null }) => {
   const [papers, setPapers] = useState<ResearchPaper[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  const categories = [
-    'Computer Science',
-    'Biology',
-    'Physics',
-    'Chemistry',
-    'Mathematics',
-    'Economics',
-    'Other'
-  ];
-
-  const statusLabels = ['Submitted', 'Approved', 'Rejected'];
+  const [error, setError] = useState('');
 
   const fetchPapers = useCallback(async () => {
-    if (!provider) return;
+    if (!provider || !isConfiguredAddress(RESEARCH_REGISTRY_ADDRESS)) {
+      setPapers([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
 
     try {
-      // In a real implementation, we would fetch all papers
-      // For now, we'll create sample data
-      const samplePapers: ResearchPaper[] = [
-        {
-          id: 1,
-          cid: 'QmExample1',
-          hash: '0x1234567890123456789012345678901234567890123456789012345678901234',
-          title: 'Advancements in Decentralized Governance',
-          paperAbstract: 'This paper explores new mechanisms for decentralized decision-making...',
-          authors: ['Alice Researcher', 'Bob Scientist'],
-          category: 0,
-          status: 1,
-          submitter: '0x1234...5678',
-          submissionTime: Date.now() / 1000,
-          proposalId: 101,
-          submissionFee: 1000000000000000000n
-        },
-        {
-          id: 2,
-          cid: 'QmExample2',
-          hash: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-          title: 'Blockchain Scalability Solutions',
-          paperAbstract: 'A comprehensive analysis of Layer 2 scaling solutions...',
-          authors: ['Charlie Developer'],
-          category: 0,
-          status: 1,
-          submitter: '0x9876...5432',
-          submissionTime: Date.now() / 1000 - 86400,
-          proposalId: 102,
-          submissionFee: 1000000000000000000n
-        }
-      ];
+      const signer = await provider.getSigner();
+      const researchRegistry = new Contract(RESEARCH_REGISTRY_ADDRESS, RESEARCH_REGISTRY_ABI, signer);
+      const total = Number(await researchRegistry.getTotalPapers());
+      const loaded: ResearchPaper[] = [];
 
-      setPapers(samplePapers);
-    } catch (error) {
-      console.error('Error fetching papers:', error);
+      for (let id = 1; id <= total; id += 1) {
+        const paper = await researchRegistry.getPaperById(id);
+        loaded.push({
+          id: Number(paper.id ?? paper[0]),
+          cid: paper.cid ?? paper[1],
+          hash: paper.hash ?? paper[2],
+          title: paper.title ?? paper[3],
+          paperAbstract: paper.paperAbstract ?? paper[4],
+          authors: [...(paper.authors ?? paper[5])],
+          category: Number(paper.category ?? paper[6]),
+          status: Number(paper.status ?? paper[7]),
+          submitter: paper.submitter ?? paper[8],
+          submissionTime: Number(paper.submissionTime ?? paper[9]),
+          proposalId: Number(paper.proposalId ?? paper[10]),
+          submissionFee: BigInt(paper.submissionFee ?? paper[11]),
+        });
+      }
+
+      setPapers(loaded.reverse());
+    } catch (fetchError) {
+      console.error('Error fetching papers:', fetchError);
+      setError('Unable to read the research registry on this network.');
     } finally {
       setLoading(false);
     }
@@ -83,113 +93,109 @@ const ResearchArchive = ({ provider }: { provider: BrowserProvider | null; accou
     fetchPapers();
   }, [fetchPapers]);
 
-  const filteredPapers = papers.filter(paper => {
+  const filteredPapers = useMemo(() => papers.filter((paper) => {
+    const term = searchTerm.toLowerCase();
     const matchesCategory = filterCategory === 'all' || paper.category.toString() === filterCategory;
-    const matchesSearch = paper.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      paper.authors.some(author => author.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = !term ||
+      paper.title.toLowerCase().includes(term) ||
+      paper.authors.some((author) => author.toLowerCase().includes(term)) ||
+      paper.cid.toLowerCase().includes(term);
     return matchesCategory && matchesSearch;
-  });
+  }), [papers, filterCategory, searchTerm]);
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-cyan-300">Research Archive</h3>
-        <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800">
-          <p className="text-slate-300">Loading research papers...</p>
-        </div>
+      <div className="rounded-lg border border-white/10 bg-white/[0.05] p-6">
+        <p className="text-sm text-slate-300">Loading research papers...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-cyan-300">Research Archive</h3>
-
-      <div className="bg-slate-900/70 p-6 rounded-lg border border-slate-800 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-slate-300 text-sm mb-2">Search</label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by title or author"
-              className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 text-sm mb-2">Category</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((cat, index) => (
-                <option key={index} value={index}>{cat}</option>
-              ))}
-            </select>
-          </div>
+    <div className="rounded-lg border border-white/10 bg-white/[0.05] p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Research archive</p>
+          <h3 className="mt-1 text-xl font-bold text-white">Submitted papers</h3>
         </div>
+        <button onClick={fetchPapers} className="h-10 rounded-lg border border-white/10 px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+          Refresh
+        </button>
+      </div>
 
-        <div className="space-y-4 mt-6">
-          {filteredPapers.length === 0 ? (
-            <p className="text-slate-400 text-center py-4">No research papers found.</p>
-          ) : (
-            filteredPapers.map((paper) => (
-              <div key={paper.id} className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-lg font-semibold text-cyan-300">{paper.title}</h4>
-                    <p className="text-slate-400 text-sm mt-1">
-                      by {paper.authors.join(', ')}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${paper.status === 0 ? 'bg-yellow-500/20 text-yellow-300' :
-                    paper.status === 1 ? 'bg-green-500/20 text-green-300' :
-                      'bg-red-500/20 text-red-300'
-                    }`}>
-                    {statusLabels[paper.status]}
-                  </span>
+      {!isConfiguredAddress(RESEARCH_REGISTRY_ADDRESS) && (
+        <div className="mb-5 rounded-lg border border-amber-200/20 bg-amber-200/10 p-4 text-sm text-amber-50">
+          Configure VITE_RESEARCH_REGISTRY_ADDRESS after deployment to enable live research reads.
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-5 rounded-lg border border-rose-200/20 bg-rose-200/10 p-4 text-sm text-rose-50">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search title, author, or CID"
+          className="h-11 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-cyan-300/70"
+        />
+
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="h-11 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-cyan-300/70"
+        >
+          <option value="all">All categories</option>
+          {categories.map((cat, index) => (
+            <option key={cat} value={index}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {filteredPapers.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
+            No research papers found for this filter.
+          </div>
+        ) : (
+          filteredPapers.map((paper) => (
+            <article key={paper.id} className="rounded-lg border border-white/10 bg-slate-950/45 p-4 transition duration-200 hover:border-cyan-200/30">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h4 className="text-lg font-bold text-white">{paper.title}</h4>
+                  <p className="mt-1 text-sm text-slate-400">by {paper.authors.join(', ') || 'Unknown author'}</p>
                 </div>
-
-                <p className="text-slate-300 text-sm mt-3 line-clamp-2">
-                  {paper.paperAbstract}
-                </p>
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">
-                    {categories[paper.category]}
-                  </span>
-                  <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded">
-                    Submitted: {new Date(paper.submissionTime * 1000).toLocaleDateString()}
-                  </span>
-                  {paper.proposalId > 0 && (
-                    <span className="px-2 py-1 bg-cyan-500/20 text-cyan-300 text-xs rounded">
-                      Proposal #{paper.proposalId}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex gap-2 mt-4">
-                  <a
-                    href={`https://ipfs.io/ipfs/${paper.cid}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-cyan-400 hover:text-cyan-300"
-                  >
-                    View on IPFS
-                  </a>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-sm text-slate-400">
-                    Hash: {paper.hash.substring(0, 10)}...{paper.hash.substring(paper.hash.length - 8)}
-                  </span>
-                </div>
+                <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(paper.status)}`}>
+                  {statusLabels[paper.status] ?? 'Unknown'}
+                </span>
               </div>
-            ))
-          )}
-        </div>
+
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">{paper.paperAbstract}</p>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-cyan-100">{categories[paper.category] ?? 'Other'}</span>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
+                  Submitted {paper.submissionTime ? new Date(paper.submissionTime * 1000).toLocaleDateString() : 'recently'}
+                </span>
+                <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
+                  Fee {ethers.formatEther(paper.submissionFee)} TDT
+                </span>
+                {paper.proposalId > 0 && <span className="rounded-full bg-indigo-300/10 px-3 py-1 text-indigo-100">Proposal #{paper.proposalId}</span>}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                <a href={`https://ipfs.io/ipfs/${paper.cid}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-cyan-200 hover:text-cyan-100">
+                  View IPFS artifact
+                </a>
+                <span className="font-mono">{paper.hash.slice(0, 12)}...{paper.hash.slice(-8)}</span>
+              </div>
+            </article>
+          ))
+        )}
       </div>
     </div>
   );

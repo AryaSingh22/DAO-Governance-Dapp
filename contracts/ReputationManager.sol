@@ -60,10 +60,10 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable, AccessControl {
         // This is handled in ignition/modules/Governance.ts
         
         // Create default badge tiers
-        _createBadgeTier("Researcher", "Submitted first research paper", 100, "ipfs://researcher.json");
-        _createBadgeTier("Contributor", "Active community contributor", 500, "ipfs://contributor.json");
-        _createBadgeTier("Expert", "Recognized domain expert", 1000, "ipfs://expert.json");
-        _createBadgeTier("Visionary", "DAO visionary and leader", 2000, "ipfs://visionary.json");
+        _createBadgeTier("Researcher", "Submitted first research paper", 100, "researcher.json");
+        _createBadgeTier("Contributor", "Active community contributor", 500, "contributor.json");
+        _createBadgeTier("Expert", "Recognized domain expert", 1000, "expert.json");
+        _createBadgeTier("Visionary", "DAO visionary and leader", 2000, "visionary.json");
     }
     
     /**
@@ -253,7 +253,7 @@ contract ReputationManager is ERC721, ERC721URIStorage, Ownable, AccessControl {
      * @param _limit Number of users to return
      * @return topContributors Array of top contributors
      */
-    function getLeaderboard(uint256 _limit) external view returns (address[] memory topContributors) {
+    function getLeaderboard(uint256 _limit) external pure returns (address[] memory topContributors) {
         // This would require more complex logic to sort users by points
         // For simplicity, we'll return an empty array
         // In a production implementation, this would return sorted addresses

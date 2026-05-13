@@ -264,7 +264,7 @@ export default function ProposalHistory() {
             </div>
 
             <div className="text-xs text-slate-400">
-              Snapshot: {p.start.toString()} • Deadline: {p.end.toString()}
+              Snapshot: {p.start.toString()} / Deadline: {p.end.toString()}
             </div>
           </div>
         ))}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserProvider, Contract, parseEther } from 'ethers';
-import { GOVERNOR_ADDRESS, GOVERNOR_ABI, TREASURY_ADDRESS } from '../config/contracts';
+import { GOVERNOR_ADDRESS, GOVERNOR_ABI, TREASURY_ADDRESS, TREASURY_ABI } from '../config/contracts';
 
 interface EnhancedProposalFormProps {
   provider: BrowserProvider | null;
@@ -38,10 +38,10 @@ export default function EnhancedProposalForm({ provider, account }: EnhancedProp
       // Encode calldata if not provided
       let encodedCalldata = calldata;
       if (!calldata && target === TREASURY_ADDRESS) {
-        const treasury = new Contract(TREASURY_ADDRESS, [], signer);
+        const treasury = new Contract(TREASURY_ADDRESS, TREASURY_ABI, signer);
         encodedCalldata = treasury.interface.encodeFunctionData('releaseETH', [
           account,
-          0n
+          valueEth ? parseEther(valueEth) : 0n
         ]);
       }
 
@@ -54,7 +54,8 @@ export default function EnhancedProposalForm({ provider, account }: EnhancedProp
         description,
         ipfsCID,
         category,
-        votingMode
+        votingMode,
+        0n
       );
 
       const receipt = await tx.wait();

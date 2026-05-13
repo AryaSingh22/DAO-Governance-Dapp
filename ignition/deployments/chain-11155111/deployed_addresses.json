@@ -1,0 +1,9 @@
+{
+  "GovernanceModule#GovernanceToken": "0x8a7f1653C5b02816e988090484350036c914e367",
+  "GovernanceModule#MembershipNFT": "0x90e1A8C456c7396584A2Eb11b419674940635D43",
+  "GovernanceModule#ReputationManager": "0x2D1Ce083a33095C933b6797feeEC51e6541db49B",
+  "GovernanceModule#TimelockController": "0xaB6EB6A66879be41F73975e8CDdE2f1999629111",
+  "GovernanceModule#MyGovernor": "0xc8D715Ca12233844F16FBb586E4b40A55DdB29b5",
+  "GovernanceModule#ResearchRegistry": "0x8248bCa3C6AF3BbD5Ff2cF5A6e473d901ACCd091",
+  "GovernanceModule#Treasury": "0xa52Ce1d01e63D6178d307a1988DC82C17d223634"
+}

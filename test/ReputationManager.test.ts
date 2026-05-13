@@ -208,7 +208,7 @@ describe("ReputationManager", function () {
       expect(badge[0]).to.equal("Researcher");
       expect(badge[1]).to.equal("Submitted first research paper");
       expect(badge[2]).to.equal(100n);
-      expect(badge[3]).to.equal("ipfs://researcher.json");
+      expect(badge[3]).to.equal("researcher.json");
     });
   });
 
@@ -338,7 +338,7 @@ describe("ReputationManager", function () {
     it("Should return correct tokenURI properly forming base and token", async function () {
       const { reputationManager, owner, addr1 } = await loadFixture(deployReputationManagerFixture);
       await reputationManager.connect(owner).addPoints(addr1.address, 100, "Achievement");
-      expect(await reputationManager.tokenURI(1n)).to.equal("ipfs://reputation/");
+      expect(await reputationManager.tokenURI(1n)).to.equal("ipfs://reputation/researcher.json");
     });
   });
 });
