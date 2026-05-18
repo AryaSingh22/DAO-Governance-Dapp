@@ -404,13 +404,10 @@ describe("ResearchRegistry", function () {
       expect(rep[1]).to.equal(1n); // 1 submission
 
       // Approve paper -> should earn review points for the APPROVER
-      // Note: In Hardhat local environment, `try reputationManager.addReviewPoints` silently fails
-      // because of gas/context limits during external calls in non-optimized transactions.
-      // Leaving try/catch in the contract for DAO security, but adjusting test expectation to 0.
-      await researchRegistry.connect(owner).approvePaper(1n);
+      await researchRegistry.connect(owner).approvePaper(1n, { gasLimit: 1_000_000 });
       rep = await reputationManager.getUserReputation(owner.address);
-      expect(rep[0]).to.equal(0n); // Expected 0 due to try/catch swallow in Hardhat
-      expect(rep[3]).to.equal(0n); // 0 reviews
+      expect(rep[0]).to.equal(25n); // 25 review points
+      expect(rep[3]).to.equal(1n); // 1 review
     });
 
     it("Should revert if non-owner tries to setReputationManager", async function () {
