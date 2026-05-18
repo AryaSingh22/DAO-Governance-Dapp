@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { BrowserProvider, Contract, ethers } from 'ethers';
 import { TOKEN_ADDRESS, TOKEN_ABI, TREASURY_ADDRESS, TREASURY_ABI, MEMBERSHIP_NFT_ADDRESS, MEMBERSHIP_NFT_ABI } from '../config/contracts';
 
+type DashboardTab = 'governance' | 'research' | 'reputation' | 'history' | 'token';
+
 type DAOMetrics = {
   totalTokenSupply: string;
   totalMembers: number;
@@ -9,10 +11,13 @@ type DAOMetrics = {
   activeStreams: number;
   totalStreamsValue: string;
   averageVotingPower: string;
-  topHolders: Array<{ address: string; balance: string; percentage: number }>;
 };
 
-export default function Dashboard() {
+type DashboardProps = {
+  onNavigate: (tab: DashboardTab) => void;
+};
+
+export default function Dashboard({ onNavigate }: DashboardProps) {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [token, setToken] = useState<Contract | null>(null);
   const [treasury, setTreasury] = useState<Contract | null>(null);
@@ -24,7 +29,6 @@ export default function Dashboard() {
     activeStreams: 0,
     totalStreamsValue: '0',
     averageVotingPower: '0',
-    topHolders: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -60,19 +64,10 @@ export default function Dashboard() {
       // Membership metrics
       const totalMembers = await membershipNFT.totalSupply();
 
-      // Treasury streams (simplified - in real app you'd track all streams)
-      const activeStreams = 0; // Would need to iterate through all streams
-      const totalStreamsValue = '0'; // Would calculate from active streams
+      const activeStreams = 0;
+      const totalStreamsValue = '0';
 
-      // Voting power metrics
-      const averageVotingPower = ethers.formatEther(totalSupply / 10n); // Simplified
-
-      // Top holders (simplified - would need to track all holders)
-      const topHolders = [
-        { address: '0x1234...', balance: ethers.formatEther(totalSupply / 4n), percentage: 25 },
-        { address: '0x5678...', balance: ethers.formatEther(totalSupply / 8n), percentage: 12.5 },
-        { address: '0x9abc...', balance: ethers.formatEther(totalSupply / 16n), percentage: 6.25 }
-      ];
+      const averageVotingPower = totalMembers > 0n ? ethers.formatEther(totalSupply / totalMembers) : '0';
 
       setMetrics({
         totalTokenSupply: ethers.formatEther(totalSupply),
@@ -81,7 +76,6 @@ export default function Dashboard() {
         activeStreams,
         totalStreamsValue,
         averageVotingPower,
-        topHolders
       });
     } catch (error) {
       console.error('Error loading metrics:', error);
@@ -151,24 +145,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Token Distribution */}
+      {/* Live data coverage */}
       <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
-        <h4 className="text-lg font-semibold text-slate-100 mb-4">Top Token Holders</h4>
-        <div className="space-y-2">
-          {metrics.topHolders.map((holder, index) => (
-            <div key={index} className="flex justify-between items-center p-2 bg-slate-800/50 rounded">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 bg-cyan-600 rounded-full flex items-center justify-center text-xs font-bold">
-                  {index + 1}
-                </div>
-                <span className="text-slate-300 font-mono">{holder.address}</span>
-              </div>
-              <div className="text-right">
-                <div className="text-slate-100 font-semibold">{formatNumber(holder.balance)}</div>
-                <div className="text-xs text-slate-400">{holder.percentage}%</div>
-              </div>
-            </div>
-          ))}
+        <h4 className="text-lg font-semibold text-slate-100 mb-3">Live Data Coverage</h4>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-3">
+            <div className="text-sm font-semibold text-cyan-100">On-chain</div>
+            <p className="mt-1 text-xs leading-5 text-slate-300">Token supply, membership count, treasury ETH balance, and wallet voting power read directly from Sepolia.</p>
+          </div>
+          <div className="rounded-lg border border-amber-300/20 bg-amber-300/10 p-3">
+            <div className="text-sm font-semibold text-amber-100">Indexer needed</div>
+            <p className="mt-1 text-xs leading-5 text-slate-300">Top holder rankings and all historical streams need an event indexer before they can be shown as complete analytics.</p>
+          </div>
+          <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-3">
+            <div className="text-sm font-semibold text-emerald-100">Demo-ready</div>
+            <p className="mt-1 text-xs leading-5 text-slate-300">The buttons below now open the real working screens instead of acting like inactive placeholders.</p>
+          </div>
         </div>
       </div>
 
@@ -176,17 +168,17 @@ export default function Dashboard() {
       <div className="bg-slate-900/70 p-4 rounded-lg border border-slate-800">
         <h4 className="text-lg font-semibold text-slate-100 mb-4">Quick Actions</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
-            Mint Tokens
+          <button onClick={() => onNavigate('token')} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm transition">
+            Token Controls
           </button>
-          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
-            Join DAO
+          <button onClick={() => onNavigate('research')} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition">
+            Submit Research
           </button>
-          <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm">
-            Delegate Votes
+          <button onClick={() => onNavigate('governance')} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm transition">
+            Governance
           </button>
-          <button className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm">
-            Claim Stream
+          <button onClick={() => onNavigate('reputation')} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm transition">
+            Reputation
           </button>
         </div>
       </div>

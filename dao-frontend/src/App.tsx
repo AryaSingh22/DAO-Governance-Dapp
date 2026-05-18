@@ -14,7 +14,13 @@ import {
   Vote,
   Wallet,
 } from 'lucide-react'
-import { TOKEN_ADDRESS, TOKEN_ABI } from './config/contracts'
+import {
+  MEMBERSHIP_NFT_ADDRESS,
+  MEMBERSHIP_NFT_ABI,
+  TOKEN_ADDRESS,
+  TOKEN_ABI,
+  ZERO_ADDRESS,
+} from './config/contracts'
 import Governance from './components/Governance'
 import ProposalHistory from './components/ProposalHistory'
 import Dashboard from './components/Dashboard'
@@ -41,8 +47,12 @@ function App() {
   const [provider, setProvider] = useState<BrowserProvider | null>(null)
   const [account, setAccount] = useState<string | null>(null)
   const [token, setToken] = useState<Contract | null>(null)
+  const [membershipNFT, setMembershipNFT] = useState<Contract | null>(null)
   const [balance, setBalance] = useState('0')
   const [votingPower, setVotingPower] = useState('0')
+  const [delegatedTo, setDelegatedTo] = useState(ZERO_ADDRESS)
+  const [tokenOwner, setTokenOwner] = useState('')
+  const [isMember, setIsMember] = useState(false)
   const [delegatee, setDelegatee] = useState('')
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [status, setStatus] = useState('')
@@ -63,27 +73,35 @@ function App() {
   useEffect(() => {
     if (!provider || !account) {
       setToken(null)
+      setMembershipNFT(null)
       return
     }
 
     provider.getSigner().then((signer) => {
       setToken(new Contract(TOKEN_ADDRESS, TOKEN_ABI, signer))
+      setMembershipNFT(new Contract(MEMBERSHIP_NFT_ADDRESS, MEMBERSHIP_NFT_ABI, signer))
     }).catch(console.error)
   }, [provider, account])
 
   const refreshTokenState = useCallback(async () => {
     if (!token || !account) return
     try {
-      const [rawBalance, rawVotes] = await Promise.all([
+      const [rawBalance, rawVotes, currentDelegate, ownerAddress, membershipStatus] = await Promise.all([
         token.balanceOf(account),
         token.getVotes(account),
+        token.delegates(account),
+        token.owner(),
+        membershipNFT ? membershipNFT.isMember(account) : Promise.resolve(false),
       ])
       setBalance(ethers.formatEther(rawBalance))
       setVotingPower(ethers.formatEther(rawVotes))
+      setDelegatedTo(currentDelegate)
+      setTokenOwner(ownerAddress)
+      setIsMember(Boolean(membershipStatus))
     } catch (error) {
       console.error('Failed to load token state:', error)
     }
-  }, [token, account])
+  }, [token, membershipNFT, account])
 
   useEffect(() => {
     refreshTokenState()
@@ -110,6 +128,11 @@ function App() {
 
   const mintTokens = async () => {
     if (!token || !account) return
+    if (!isTokenOwner) {
+      setStatus(`Minting is owner-only. Token owner: ${shortAddress(tokenOwner)}`)
+      return
+    }
+
     setIsWorking(true)
     setStatus('Minting governance tokens...')
     try {
@@ -127,6 +150,11 @@ function App() {
 
   const delegateVotes = async () => {
     if (!token || !delegatee) return
+    if (!ethers.isAddress(delegatee)) {
+      setStatus('Enter a valid delegate address that starts with 0x.')
+      return
+    }
+
     setIsWorking(true)
     setStatus('Delegating voting power...')
     try {
@@ -143,6 +171,43 @@ function App() {
     }
   }
 
+  const selfDelegateVotes = async () => {
+    if (!token || !account) return
+    setIsWorking(true)
+    setStatus('Self-delegating voting power...')
+    try {
+      const tx = await token.delegate(account)
+      await tx.wait()
+      await refreshTokenState()
+      setStatus('Voting power delegated to your connected wallet.')
+    } catch (error) {
+      console.error('Error self-delegating votes:', error)
+      setStatus('Self-delegation failed. Confirm MetaMask is on Sepolia and try again.')
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
+  const joinDAO = async () => {
+    if (!membershipNFT) return
+    setIsWorking(true)
+    setStatus('Joining DAO membership...')
+    try {
+      const price = await membershipNFT.mintPrice()
+      const tx = await membershipNFT.mint('member.json', { value: price })
+      await tx.wait()
+      await refreshTokenState()
+      setStatus('DAO membership NFT minted.')
+    } catch (error) {
+      console.error('Error joining DAO:', error)
+      setStatus('Join DAO failed. Check Sepolia network, wallet funds, or existing membership.')
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
+  const isTokenOwner = Boolean(account && tokenOwner && account.toLowerCase() === tokenOwner.toLowerCase())
+  const isSelfDelegated = Boolean(account && delegatedTo.toLowerCase() === account.toLowerCase())
   const activeTitle = useMemo(() => tabs.find((tab) => tab.id === activeTab)?.label ?? 'Dashboard', [activeTab])
 
   return (
@@ -254,7 +319,7 @@ function App() {
               </div>
 
               <div className="animate-[fadeIn_220ms_ease-out]">
-                {activeTab === 'dashboard' && <Dashboard />}
+                {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
                 {activeTab === 'governance' && <Governance />}
                 {activeTab === 'research' && (
                   <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -270,17 +335,52 @@ function App() {
                       <div className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
                         <p className="text-sm text-slate-400">Your voting power</p>
                         <p className="mt-2 text-3xl font-bold text-cyan-200">{Number(votingPower).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                        <p className="mt-1 text-sm text-slate-400">Self-delegate after minting to activate proposal voting.</p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {isSelfDelegated ? 'Delegated to this wallet.' : 'Self-delegate to activate proposal voting.'}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
                         <p className="text-sm text-slate-400">Available balance</p>
                         <p className="mt-2 text-3xl font-bold text-white">{Number(balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                        <p className="mt-1 text-sm text-slate-400">TDT governance tokens in this wallet.</p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {isMember ? 'DAO membership active.' : 'Join the DAO to mint your membership NFT.'}
+                        </p>
                       </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <button
+                        onClick={selfDelegateVotes}
+                        disabled={isWorking || isSelfDelegated}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Vote size={17} />
+                        {isSelfDelegated ? 'Self-delegated' : 'Self delegate'}
+                      </button>
+                      <button
+                        onClick={joinDAO}
+                        disabled={isWorking || isMember}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ShieldCheck size={17} />
+                        {isMember ? 'Member active' : 'Join DAO'}
+                      </button>
+                      <button
+                        onClick={mintTokens}
+                        disabled={isWorking || !isTokenOwner}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-amber-300 px-5 text-sm font-bold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        title={isTokenOwner ? 'Mint demo governance tokens' : `Only ${tokenOwner ? shortAddress(tokenOwner) : 'the token owner'} can mint`}
+                      >
+                        <Coins size={17} />
+                        {isTokenOwner ? 'Mint 1,000 TDT' : 'Owner-only mint'}
+                      </button>
                     </div>
 
                     <div className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
                       <label className="text-sm font-semibold text-slate-200" htmlFor="delegatee">Delegate votes</label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Current delegate: <span className="font-mono text-slate-200">{shortAddress(delegatedTo)}</span>
+                      </p>
                       <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
                         <input
                           id="delegatee"
@@ -299,15 +399,6 @@ function App() {
                         </button>
                       </div>
                     </div>
-
-                    <button
-                      onClick={mintTokens}
-                      disabled={isWorking}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-60"
-                    >
-                      <Coins size={17} />
-                      Mint 1,000 TDT
-                    </button>
                   </div>
                 )}
               </div>
