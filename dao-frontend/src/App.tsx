@@ -30,6 +30,8 @@ import ReputationBadges from './components/ReputationBadges'
 
 type TabId = 'dashboard' | 'governance' | 'research' | 'reputation' | 'history' | 'token'
 type WalletProvider = NonNullable<Window['ethereum']> & {
+  isMetaMask?: boolean
+  isPhantom?: boolean
   on?: (event: string, handler: (value: unknown) => void) => void
   removeListener?: (event: string, handler: (value: unknown) => void) => void
 }
@@ -45,6 +47,12 @@ const tabs: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+function walletName(ethereum?: WalletProvider) {
+  if (ethereum?.isPhantom) return 'Phantom'
+  if (ethereum?.isMetaMask) return 'MetaMask'
+  return 'your wallet'
 }
 
 async function requestWalletAccounts(ethereum: WalletProvider, forcePicker: boolean) {
@@ -158,22 +166,24 @@ function App() {
   const connectWallet = async () => {
     const ethereum = window.ethereum as WalletProvider | undefined
     if (!ethereum) {
-      setStatus('MetaMask or another EIP-1193 wallet is required.')
+      setStatus('A browser wallet is required.')
       return
     }
 
     setIsWorking(true)
     try {
-      setStatus(account ? 'Opening MetaMask account selector...' : 'Opening wallet connection...')
+      const activeWallet = walletName(ethereum)
+      setStatus(account ? `Opening ${activeWallet} account selector...` : `Opening ${activeWallet} connection...`)
       const previousAccount = account
       const accounts = await requestWalletAccounts(ethereum, Boolean(account))
       const nextAccount = accounts[0] ?? null
       setAccount(nextAccount)
       setProvider(new BrowserProvider(ethereum))
       if (previousAccount && nextAccount && previousAccount.toLowerCase() === nextAccount.toLowerCase()) {
-        setStatus(`MetaMask returned the same wallet: ${shortAddress(nextAccount)}. If the chooser did not open, use MetaMask > three dots > Connected sites > Disconnect this site, then click Switch wallet again.`)
+        const ownerLabel = tokenOwner ? shortAddress(tokenOwner) : 'the token owner address'
+        setStatus(`${activeWallet} returned the same address: ${shortAddress(nextAccount)}. To mint, switch or import ${ownerLabel} in ${activeWallet}, or disconnect this site from the wallet's connected apps and try again.`)
       } else {
-        setStatus(nextAccount ? `Wallet connected: ${shortAddress(nextAccount)}.` : 'No wallet account selected.')
+        setStatus(nextAccount ? `${activeWallet} connected: ${shortAddress(nextAccount)}.` : 'No wallet account selected.')
       }
     } catch (error) {
       console.error('Error connecting wallet:', error)
@@ -186,7 +196,8 @@ function App() {
   const mintTokens = async () => {
     if (!token || !account) return
     if (!isTokenOwner) {
-      setStatus(`Minting is owner-only. Token owner: ${shortAddress(tokenOwner)}`)
+      const ownerLabel = tokenOwner ? shortAddress(tokenOwner) : 'the token owner address'
+      setStatus(`Minting is owner-only. Connected address ${shortAddress(account)} must match ${ownerLabel}.`)
       return
     }
 
@@ -239,7 +250,7 @@ function App() {
       setStatus('Voting power delegated to your connected wallet.')
     } catch (error) {
       console.error('Error self-delegating votes:', error)
-      setStatus('Self-delegation failed. Confirm MetaMask is on Sepolia and try again.')
+      setStatus('Self-delegation failed. Confirm your wallet is on Sepolia and try again.')
     } finally {
       setIsWorking(false)
     }
@@ -293,7 +304,7 @@ function App() {
             <button
               onClick={connectWallet}
               disabled={isWorking}
-              title={account ? 'Disconnect this site permission and reopen the MetaMask account selector' : 'Connect wallet'}
+              title={account ? 'Reopen the connected wallet account selector' : 'Connect wallet'}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-400 px-5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition duration-200 hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isWorking ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
