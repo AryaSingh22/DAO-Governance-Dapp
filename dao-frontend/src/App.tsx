@@ -51,6 +51,15 @@ async function requestWalletAccounts(ethereum: WalletProvider, forcePicker: bool
   if (forcePicker) {
     try {
       await ethereum.request({
+        method: 'wallet_revokePermissions',
+        params: [{ eth_accounts: {} }],
+      })
+    } catch (error) {
+      console.warn('Wallet permission revoke was unavailable:', error)
+    }
+
+    try {
+      await ethereum.request({
         method: 'wallet_requestPermissions',
         params: [{ eth_accounts: {} }],
       })
@@ -155,10 +164,17 @@ function App() {
 
     setIsWorking(true)
     try {
+      setStatus(account ? 'Opening MetaMask account selector...' : 'Opening wallet connection...')
+      const previousAccount = account
       const accounts = await requestWalletAccounts(ethereum, Boolean(account))
-      setAccount(accounts[0] ?? null)
+      const nextAccount = accounts[0] ?? null
+      setAccount(nextAccount)
       setProvider(new BrowserProvider(ethereum))
-      setStatus(accounts[0] ? `Wallet connected: ${shortAddress(accounts[0])}.` : 'No wallet account selected.')
+      if (previousAccount && nextAccount && previousAccount.toLowerCase() === nextAccount.toLowerCase()) {
+        setStatus(`MetaMask returned the same wallet: ${shortAddress(nextAccount)}. If the chooser did not open, use MetaMask > three dots > Connected sites > Disconnect this site, then click Switch wallet again.`)
+      } else {
+        setStatus(nextAccount ? `Wallet connected: ${shortAddress(nextAccount)}.` : 'No wallet account selected.')
+      }
     } catch (error) {
       console.error('Error connecting wallet:', error)
       setStatus('Wallet connection was cancelled or failed.')
@@ -277,6 +293,7 @@ function App() {
             <button
               onClick={connectWallet}
               disabled={isWorking}
+              title={account ? 'Disconnect this site permission and reopen the MetaMask account selector' : 'Connect wallet'}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-400 px-5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition duration-200 hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isWorking ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
