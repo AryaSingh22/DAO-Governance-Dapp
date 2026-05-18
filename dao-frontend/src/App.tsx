@@ -29,6 +29,10 @@ import ResearchArchive from './components/ResearchArchive'
 import ReputationBadges from './components/ReputationBadges'
 
 type TabId = 'dashboard' | 'governance' | 'research' | 'reputation' | 'history' | 'token'
+type WalletProvider = NonNullable<Window['ethereum']> & {
+  on?: (event: string, handler: (value: unknown) => void) => void
+  removeListener?: (event: string, handler: (value: unknown) => void) => void
+}
 
 const tabs: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -41,6 +45,21 @@ const tabs: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+async function requestWalletAccounts(ethereum: WalletProvider, forcePicker: boolean) {
+  if (forcePicker) {
+    try {
+      await ethereum.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      })
+    } catch (error) {
+      console.warn('Wallet account picker was unavailable or cancelled:', error)
+    }
+  }
+
+  return ethereum.request({ method: 'eth_requestAccounts' }) as Promise<string[]>
 }
 
 function App() {
@@ -59,15 +78,35 @@ function App() {
   const [isWorking, setIsWorking] = useState(false)
 
   useEffect(() => {
-    if (!window.ethereum) return
+    const ethereum = window.ethereum as WalletProvider | undefined
+    if (!ethereum) return
 
-    const nextProvider = new BrowserProvider(window.ethereum)
+    const nextProvider = new BrowserProvider(ethereum)
     setProvider(nextProvider)
 
-    window.ethereum.request({ method: 'eth_accounts' }).then((accounts) => {
+    ethereum.request({ method: 'eth_accounts' }).then((accounts) => {
       const [firstAccount] = accounts as string[]
       if (firstAccount) setAccount(firstAccount)
     }).catch(console.error)
+
+    const handleAccountsChanged = (value: unknown) => {
+      const [nextAccount] = value as string[]
+      setAccount(nextAccount ?? null)
+      setStatus(nextAccount ? `Wallet switched to ${shortAddress(nextAccount)}.` : 'Wallet disconnected.')
+    }
+
+    const handleChainChanged = () => {
+      setProvider(new BrowserProvider(ethereum))
+      setStatus('Network changed. Wallet data refreshed.')
+    }
+
+    ethereum.on?.('accountsChanged', handleAccountsChanged)
+    ethereum.on?.('chainChanged', handleChainChanged)
+
+    return () => {
+      ethereum.removeListener?.('accountsChanged', handleAccountsChanged)
+      ethereum.removeListener?.('chainChanged', handleChainChanged)
+    }
   }, [])
 
   useEffect(() => {
@@ -108,16 +147,18 @@ function App() {
   }, [refreshTokenState])
 
   const connectWallet = async () => {
-    if (!window.ethereum) {
+    const ethereum = window.ethereum as WalletProvider | undefined
+    if (!ethereum) {
       setStatus('MetaMask or another EIP-1193 wallet is required.')
       return
     }
 
     setIsWorking(true)
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
+      const accounts = await requestWalletAccounts(ethereum, Boolean(account))
       setAccount(accounts[0] ?? null)
-      setStatus('Wallet connected.')
+      setProvider(new BrowserProvider(ethereum))
+      setStatus(accounts[0] ? `Wallet connected: ${shortAddress(accounts[0])}.` : 'No wallet account selected.')
     } catch (error) {
       console.error('Error connecting wallet:', error)
       setStatus('Wallet connection was cancelled or failed.')
@@ -239,7 +280,7 @@ function App() {
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-cyan-400 px-5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/30 transition duration-200 hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isWorking ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
-              {account ? 'Reconnect' : 'Connect wallet'}
+              {account ? 'Switch wallet' : 'Connect wallet'}
             </button>
           </div>
         </header>
@@ -298,6 +339,10 @@ function App() {
                   <div>
                     <p className="text-xs text-slate-400">Voting power</p>
                     <p className="text-lg font-bold text-cyan-200">{Number(votingPower).toLocaleString(undefined, { maximumFractionDigits: 2 })} TDT</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Token owner</p>
+                    <p className="break-all font-mono text-xs text-slate-200">{tokenOwner || 'Loading owner...'}</p>
                   </div>
                 </div>
               </section>
