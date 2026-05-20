@@ -1,5 +1,5 @@
 # ResearchDAO Governance DApp - Feature Documentation 
-
+ 
 ## 1. Project Goal
 
 ResearchDAO is a decentralized governance platform for research-focused communities. It combines token voting, NFT membership, research paper submission, treasury execution, and contributor reputation into one workflow.
