@@ -1,4 +1,4 @@
-# ResearchDAO Governance DApp - Feature Documentation 
+# ResearchDAO Governance DApp - Feature Documentation
  
 ## 1. Project Goal
 
