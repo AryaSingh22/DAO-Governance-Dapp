@@ -1,5 +1,5 @@
 # 🏛️ ResearchDAO Governance DApp
- 
+
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-username/dao-governance-dapp)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/licenses/MIT)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/your-username/dao-governance-dapp)
